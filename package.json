@@ -1,0 +1,17 @@
+{
+  "name": "beepbox-2.3.1-mod",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build:synth": "bash scripts/compile_beepbox_synth.sh",
+    "build:editor": "bash scripts/compile_beepbox_editor.sh",
+    "build": "npm run clean && npm run build:synth && npm run build:editor",
+    "dev": "node scripts/dev.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.5",
+    "uglify-js": "^3.19.3"
+  }
+}

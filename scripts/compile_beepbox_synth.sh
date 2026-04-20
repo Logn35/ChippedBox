@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Compile ts/synth.ts into beepbox_synth.js
-tsc \
+# Compile synth/synth.ts into beepbox_synth.js
+npm exec -- tsc \
 	--target ES5 \
 	--ignoreDeprecations 6.0 \
 	--strictNullChecks \
@@ -9,13 +9,13 @@ tsc \
 	--noImplicitReturns \
 	--noFallthroughCasesInSwitch \
 	--removeComments \
-	ts/synth.ts \
-	--outFile beepbox-synth/beepbox_synth.js
+	synth/synth.ts \
+	--outFile website/beepbox_synth.js
 
 # Minify beepbox_synth.js into beepbox_synth.min.js
-uglifyjs \
+npm exec -- uglifyjs \
 	--compress \
 	--mangle \
 	--mangle-props regex=/^_.+/ \
-	beepbox-synth/beepbox_synth.js \
-	-o beepbox-synth/beepbox_synth.min.js
+	website/beepbox_synth.js \
+	-o website/beepbox_synth.min.js

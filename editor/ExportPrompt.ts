@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/// <reference path="synth.ts" />
+/// <reference path="../synth/synth.ts" />
 /// <reference path="SongDocument.ts" />
 /// <reference path="Prompt.ts" />
 /// <reference path="html.ts" />
@@ -31,14 +31,18 @@ interface ArrayBufferConstructor {
 
 namespace beepbox {
 	const {button, div, input, text} = html;
+	type LegacyNavigator = Navigator & {
+		msSaveOrOpenBlob?: (blob: Blob, defaultName?: string) => boolean;
+	};
 	
 	function lerp(low: number, high: number, t: number): number {
 		return low + t * (high - low);
 	}
 	
 	function save(blob: Blob, name: string): void {
-		if (navigator.msSaveOrOpenBlob) {
-			navigator.msSaveOrOpenBlob(blob, name);
+		const legacyNavigator: LegacyNavigator = navigator;
+		if (legacyNavigator.msSaveOrOpenBlob) {
+			legacyNavigator.msSaveOrOpenBlob(blob, name);
 			return;
 		}
 	
@@ -52,15 +56,15 @@ namespace beepbox {
 			// event. Seems to be related to going back in the browser history.
 			// https://bugs.chromium.org/p/chromium/issues/detail?id=825100
 			setTimeout(function() { anchor.dispatchEvent(new MouseEvent("click")); }, 0);
-		} else if (navigator.vendor.indexOf("Apple") > -1) {
-			// Safari 10.1 doesn't need this hack, delete it later.
-			var reader = new FileReader();
-			reader.onloadend = function() {
-				console.log(reader.result);
-				var url = reader.result.replace(/^data:[^;]*;/, 'data:attachment/file;');
-				if (!window.open(url, "_blank")) window.location.href = url;
-			};
-			reader.readAsDataURL(blob);
+			} else if (navigator.vendor.indexOf("Apple") > -1) {
+				// Safari 10.1 doesn't need this hack, delete it later.
+				var reader = new FileReader();
+				reader.onloadend = function() {
+					if (typeof reader.result != "string") return;
+					var url = reader.result.replace(/^data:[^;]*;/, 'data:attachment/file;');
+					if (!window.open(url, "_blank")) window.location.href = url;
+				};
+				reader.readAsDataURL(blob);
 		} else {
 			const url: string = URL.createObjectURL(blob);
 			setTimeout(function() { URL.revokeObjectURL(url); }, 60000);
@@ -193,15 +197,15 @@ namespace beepbox {
 			this._cancelButton.removeEventListener("click", this._close);
 		}
 		
-		private static _validateFileName(event: Event): void {
-			const input: HTMLInputElement = <HTMLInputElement>event.target;
-			const deleteChars = /[\+\*\$\?\|\{\}\\\/<>#%!`&'"=:@]/gi;
-			if (deleteChars.test(input.value)) {
-				let cursorPos: number = input.selectionStart;
-				input.value = input.value.replace(deleteChars, "");
-				cursorPos--;
-				input.setSelectionRange(cursorPos, cursorPos);
-			}
+			private static _validateFileName(event: Event): void {
+				const input: HTMLInputElement = <HTMLInputElement>event.target;
+				const deleteChars = /[\+\*\$\?\|\{\}\\\/<>#%!`&'"=:@]/gi;
+				if (deleteChars.test(input.value)) {
+					let cursorPos: number = input.selectionStart == null ? input.value.length : input.selectionStart;
+					input.value = input.value.replace(deleteChars, "");
+					cursorPos--;
+					input.setSelectionRange(cursorPos, cursorPos);
+				}
 		}
 		
 		private static _validateNumber(event: Event): void {

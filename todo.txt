@@ -1,0 +1,12 @@
+Backporting:
+- Long Layout
+- Drag select
+- Tempo Selection box
+- Create patterns from editing 0
+- Pitch shift by octave
+- Enter and Backspace to remove bars
+- S to solo
+- N to give next available pattern
+- Piano usable while paused
+- Hear Preview of Added Notes
+- Recreate ModBox Type A Mixing

@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/// <reference path="synth.ts" />
+/// <reference path="../synth/synth.ts" />
 /// <reference path="SongDocument.ts" />
 /// <reference path="SongEditor.ts" />
 /// <reference path="Prompt.ts" />
@@ -28,22 +28,21 @@ SOFTWARE.
 /// <reference path="changes.ts" />
 
 namespace beepbox {
-	const {button, div, text} = html;
+	const {button, div, input, text} = html;
 
-	export class ChorusPrompt implements Prompt {
-		private readonly _cancelButton: HTMLButtonElement = button({}, [text("Close")]);
+	export class ImportPrompt implements Prompt {
+		private readonly _fileInput: HTMLInputElement = input({type: "file", accept: ".json,application/json"});
+		private readonly _cancelButton: HTMLButtonElement = button({}, [text("Cancel")]);
 		
-		public readonly container: HTMLDivElement = div({className: "prompt", style: "width: 250px;"}, [
-			div({style: "font-size: 2em"}, [text("Custom Harmony")]),
-			div({style: "text-align: left;"}, [text(
-				'BeepBox "chip" instruments play two waves at once, each with their own pitch. ' +
-				'The "Chorus" setting usually determines how far apart these pitches are, but in "custom harmony" mode, you can control these pitches individually by making two simultaneous notes, one above the other. ' +
-				'This replaces the "arpeggio/trill" effect, and gives you greater control over your harmony. '
-			)]),
+		public readonly container: HTMLDivElement = div({className: "prompt", style: "width: 200px;"}, [
+			div({style: "font-size: 2em"}, [text("Import")]),
+			div({style: "text-align: left;"}, [text("BeepBox songs can be exported and re-imported as .json files. You could also use other means to make .json files for BeepBox as long as they follow the same structure.")]),
+			this._fileInput,
 			this._cancelButton,
 		]);
 		
 		constructor(private _doc: SongDocument, private _songEditor: SongEditor) {
+			this._fileInput.addEventListener("change", this._whenFileSelected);
 			this._cancelButton.addEventListener("click", this._close);
 		}
 		
@@ -52,7 +51,21 @@ namespace beepbox {
 		}
 		
 		public cleanUp = (): void => { 
+			this._fileInput.removeEventListener("change", this._whenFileSelected);
 			this._cancelButton.removeEventListener("click", this._close);
+		}
+		
+		private _whenFileSelected = (): void => {
+			const file: File = this._fileInput.files![0];
+			if (!file) return;
+			
+			const reader: FileReader = new FileReader();
+			reader.addEventListener("load", (event: Event): void => {
+				if (typeof reader.result != "string") return;
+				this._doc.prompt = null;
+				this._doc.record(new ChangeSong(this._doc, reader.result), true);
+			});
+			reader.readAsText(file);
 		}
 	}
 }

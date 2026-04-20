@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/// <reference path="synth.ts" />
+/// <reference path="../synth/synth.ts" />
 /// <reference path="SongDocument.ts" />
 /// <reference path="html.ts" />
 /// <reference path="style.ts" />
@@ -391,13 +391,13 @@ namespace beepbox {
 						throw new Error("Unrecognized prompt type.");
 				}
 				
-				if (this.prompt) {
-					this._wasPlaying = this._doc.synth.playing;
-					this._pause();
-					this._promptContainer.style.display = null;
-					this._promptContainer.appendChild(this.prompt.container);
+					if (this.prompt) {
+						this._wasPlaying = this._doc.synth.playing;
+						this._pause();
+						this._promptContainer.style.display = "";
+						this._promptContainer.appendChild(this.prompt.container);
+					}
 				}
-			}
 		}
 		
 		private _refocusStage = (): void => {
@@ -424,11 +424,11 @@ namespace beepbox {
 			}
 			
 			const channel: Channel = this._doc.song.channels[this._doc.channel];
-			const pattern: Pattern | null = this._doc.getCurrentPattern();
-			const instrumentIndex: number = this._doc.getCurrentInstrument();
-			const instrument: Instrument = channel.instruments[instrumentIndex];
-			const wasActive: boolean = this.mainLayer.contains(document.activeElement);
-			const activeElement: Element = document.activeElement;
+				const pattern: Pattern | null = this._doc.getCurrentPattern();
+				const instrumentIndex: number = this._doc.getCurrentInstrument();
+				const instrument: Instrument = channel.instruments[instrumentIndex];
+				const wasActive: boolean = this.mainLayer.contains(document.activeElement);
+				const activeElement: Element | null = document.activeElement;
 			
 			setSelectedIndex(this._scaleSelect, this._doc.song.scale);
 			setSelectedIndex(this._keySelect, this._doc.song.key);
@@ -532,9 +532,9 @@ namespace beepbox {
 			
 			// If an interface element was selected, but becomes invisible (e.g. an instrument
 			// select menu) just select the editor container so keyboard commands still work.
-			if (wasActive && (activeElement.clientWidth == 0)) {
-				this._refocusStage();
-			}
+				if (wasActive && activeElement != null && (activeElement.clientWidth == 0)) {
+					this._refocusStage();
+				}
 			
 			this._setPrompt(this._doc.prompt);
 			

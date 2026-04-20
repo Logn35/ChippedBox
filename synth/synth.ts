@@ -1775,22 +1775,22 @@ namespace beepbox {
 						instrument.transition = oldTransitionNames[transitionObject] != undefined ? oldTransitionNames[transitionObject] : Config.transitionNames.indexOf(transitionObject);
 						if (instrument.transition == -1) instrument.transition = 1;
 						
-						if (isDrum) {
-							instrument.type = Config.instrumentTypeNames.indexOf(instrumentObject.type);
-							if (instrument.type == -1) instrument.type = InstrumentType.noise;
-							
-							if (instrumentObject.volume != undefined) {
-								instrument.volume = Song._clip(0, Config.volumeNames.length, Math.round(5 - (instrumentObject.volume | 0) / 20));
+							if (isDrum) {
+								const instrumentTypeIndex: number = Config.instrumentTypeNames.indexOf(instrumentObject.type);
+								instrument.type = instrumentTypeIndex == -1 ? InstrumentType.noise : <InstrumentType> instrumentTypeIndex;
+								
+								if (instrumentObject.volume != undefined) {
+									instrument.volume = Song._clip(0, Config.volumeNames.length, Math.round(5 - (instrumentObject.volume | 0) / 20));
 							} else {
 								instrument.volume = 0;
 							}
-							instrument.wave = Config.drumNames.indexOf(instrumentObject.wave);
-							if (instrument.wave == -1) instrument.wave = 1;
-						} else {
-							instrument.type = Config.instrumentTypeNames.indexOf(instrumentObject.type);
-							if (instrument.type == -1) instrument.type = InstrumentType.chip;
-							
-							if (instrument.type == InstrumentType.chip) {
+								instrument.wave = Config.drumNames.indexOf(instrumentObject.wave);
+								if (instrument.wave == -1) instrument.wave = 1;
+							} else {
+								const instrumentTypeIndex: number = Config.instrumentTypeNames.indexOf(instrumentObject.type);
+								instrument.type = instrumentTypeIndex == -1 ? InstrumentType.chip : <InstrumentType> instrumentTypeIndex;
+								
+								if (instrument.type == InstrumentType.chip) {
 								if (instrumentObject.volume != undefined) {
 									instrument.volume = Song._clip(0, Config.volumeNames.length, Math.round(5 - (instrumentObject.volume | 0) / 20));
 								} else {
