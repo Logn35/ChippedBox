@@ -1,0 +1,10 @@
+.codex
+DEV.md
+package.json
+
+# Dev helpers
+scripts/
+
+# Generated build artifacts (keep source in ts/)
+beepbox-synth/*.js
+beepbox-synth/beepbox_offline.html
