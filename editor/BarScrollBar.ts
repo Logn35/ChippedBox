@@ -24,10 +24,10 @@ SOFTWARE.
 /// <reference path="SongDocument.ts" />
 /// <reference path="html.ts" />
 
-namespace beepbox {
-	export class BarScrollBar {
-		private readonly _editorWidth: number = 512;
-		private readonly _editorHeight: number = 20;
+	namespace beepbox {
+		export class BarScrollBar {
+			private readonly _editorWidth: number = 512;
+			private readonly _editorHeight: number = 20;
 		
 		private readonly _notches = <SVGSVGElement> svgElement("svg", {"pointer-events": "none"});
 		private readonly _handle = <SVGRectElement> svgElement("rect", {fill: "#444444", x: 0, y: 2, width: 10, height: this._editorHeight - 4});
@@ -35,15 +35,15 @@ namespace beepbox {
 		private readonly _leftHighlight = <SVGPathElement> svgElement("path", {fill: "white", "pointer-events": "none"});
 		private readonly _rightHighlight = <SVGPathElement> svgElement("path", {fill: "white", "pointer-events": "none"});
 		
-		private readonly _svg = <SVGSVGElement> svgElement("svg", {style: "background-color: #000000; touch-action: pan-y; position: absolute;", width: this._editorWidth, height: this._editorHeight}, [
-			this._notches,
-			this._handle,
-			this._handleHighlight,
-			this._leftHighlight,
-			this._rightHighlight,
-		]);
-		
-		public readonly container: HTMLElement = html.div({className: "barScrollBar", style: "width: 512px; height: 20px; overflow: hidden; position: relative;"}, [this._svg]);
+			private readonly _svg = <SVGSVGElement> svgElement("svg", {style: "background-color: #000000; touch-action: pan-y; position: absolute;", width: "100%", height: this._editorHeight, viewBox: `0 0 ${this._editorWidth} ${this._editorHeight}`, preserveAspectRatio: "none"}, [
+				this._notches,
+				this._handle,
+				this._handleHighlight,
+				this._leftHighlight,
+				this._rightHighlight,
+			]);
+			
+			public readonly container: HTMLElement = html.div({className: "barScrollBar", style: "width: 100%; height: 20px; overflow: hidden; position: relative; min-width: 0;"}, [this._svg]);
 		
 		private _mouseX: number = 0;
 		private _mouseY: number = 0;
@@ -55,7 +55,7 @@ namespace beepbox {
 		private _renderedNotchCount: number = -1;
 		private _renderedBarPos: number = -1;
 		
-		constructor(private _doc: SongDocument, private _trackContainer: HTMLDivElement) {
+			constructor(private _doc: SongDocument, private _trackContainer: HTMLDivElement) {
 			const center: number = this._editorHeight * 0.5;
 			const base: number = 20;
 			const tip: number = 9;
@@ -76,8 +76,16 @@ namespace beepbox {
 			
 			// Sorry, bypassing typescript type safety on this function because I want to use the new "passive" option.
 			//this._trackContainer.addEventListener("scroll", this._onScroll, {capture: false, passive: true});
-			(<Function>this._trackContainer.addEventListener)("scroll", this._onScroll, {capture: false, passive: true});
-		}
+				(<Function>this._trackContainer.addEventListener)("scroll", this._onScroll, {capture: false, passive: true});
+			}
+
+			private _setMouseFromClient(boundingRect: ClientRect, clientX: number, clientY: number): void {
+				// The SVG scales to fit the available width. Convert screen pixels into our fixed logical coordinate space.
+				const x = (clientX - boundingRect.left) * (this._editorWidth / boundingRect.width);
+				const y = (clientY - boundingRect.top) * (this._editorHeight / boundingRect.height);
+				this._mouseX = x;
+				this._mouseY = y;
+			}
 		
 		private _onScroll = (event: Event): void => {
 			this._doc.barScrollPos = (this._trackContainer.scrollLeft / 32);
@@ -95,47 +103,43 @@ namespace beepbox {
 			this._updatePreview();
 		}
 		
-		private _whenMousePressed = (event: MouseEvent): void => {
-			event.preventDefault();
-			this._mouseDown = true;
-			const boundingRect: ClientRect = this._svg.getBoundingClientRect();
-    		this._mouseX = (event.clientX || event.pageX) - boundingRect.left;
-		    this._mouseY = (event.clientY || event.pageY) - boundingRect.top;
-			this._updatePreview();
-			if (this._mouseX >= this._doc.barScrollPos * this._barWidth && this._mouseX <= (this._doc.barScrollPos + this._doc.trackVisibleBars) * this._barWidth) {
-				this._dragging = true;
-				this._dragStart = this._mouseX;
+			private _whenMousePressed = (event: MouseEvent): void => {
+				event.preventDefault();
+				this._mouseDown = true;
+				const boundingRect: ClientRect = this._svg.getBoundingClientRect();
+				this._setMouseFromClient(boundingRect, (event.clientX || event.pageX), (event.clientY || event.pageY));
+				this._updatePreview();
+				if (this._mouseX >= this._doc.barScrollPos * this._barWidth && this._mouseX <= (this._doc.barScrollPos + this._doc.trackVisibleBars) * this._barWidth) {
+					this._dragging = true;
+					this._dragStart = this._mouseX;
+				}
 			}
-		}
 		
-		private _whenTouchPressed = (event: TouchEvent): void => {
-			event.preventDefault();
-			this._mouseDown = true;
-			const boundingRect: ClientRect = this._svg.getBoundingClientRect();
-			this._mouseX = event.touches[0].clientX - boundingRect.left;
-			this._mouseY = event.touches[0].clientY - boundingRect.top;
-			this._updatePreview();
-			if (this._mouseX >= this._doc.barScrollPos * this._barWidth && this._mouseX <= (this._doc.barScrollPos + this._doc.trackVisibleBars) * this._barWidth) {
-				this._dragging = true;
-				this._dragStart = this._mouseX;
+			private _whenTouchPressed = (event: TouchEvent): void => {
+				event.preventDefault();
+				this._mouseDown = true;
+				const boundingRect: ClientRect = this._svg.getBoundingClientRect();
+				this._setMouseFromClient(boundingRect, event.touches[0].clientX, event.touches[0].clientY);
+				this._updatePreview();
+				if (this._mouseX >= this._doc.barScrollPos * this._barWidth && this._mouseX <= (this._doc.barScrollPos + this._doc.trackVisibleBars) * this._barWidth) {
+					this._dragging = true;
+					this._dragStart = this._mouseX;
+				}
 			}
-		}
-		
-		private _whenMouseMoved = (event: MouseEvent): void => {
-			const boundingRect: ClientRect = this._svg.getBoundingClientRect();
-    		this._mouseX = (event.clientX || event.pageX) - boundingRect.left;
-		    this._mouseY = (event.clientY || event.pageY) - boundingRect.top;
-		    this._whenCursorMoved();
-		}
-		
-		private _whenTouchMoved = (event: TouchEvent): void => {
-			if (!this._mouseDown) return;
-			event.preventDefault();
-			const boundingRect: ClientRect = this._svg.getBoundingClientRect();
-			this._mouseX = event.touches[0].clientX - boundingRect.left;
-			this._mouseY = event.touches[0].clientY - boundingRect.top;
-		    this._whenCursorMoved();
-		}
+			
+			private _whenMouseMoved = (event: MouseEvent): void => {
+				const boundingRect: ClientRect = this._svg.getBoundingClientRect();
+				this._setMouseFromClient(boundingRect, (event.clientX || event.pageX), (event.clientY || event.pageY));
+			    this._whenCursorMoved();
+			}
+			
+			private _whenTouchMoved = (event: TouchEvent): void => {
+				if (!this._mouseDown) return;
+				event.preventDefault();
+				const boundingRect: ClientRect = this._svg.getBoundingClientRect();
+				this._setMouseFromClient(boundingRect, event.touches[0].clientX, event.touches[0].clientY);
+			    this._whenCursorMoved();
+			}
 		
 		private _whenCursorMoved(): void {
 			if (this._dragging) {

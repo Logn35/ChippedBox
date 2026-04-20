@@ -91,7 +91,9 @@ namespace beepbox {
 	export class SongEditor {
 		public prompt: Prompt | null = null;
 		
-		private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc);
+		private readonly _patternEditorPrev: PatternEditor = new PatternEditor(this._doc, false, -1);
+		private readonly _patternEditor: PatternEditor = new PatternEditor(this._doc, true, 0);
+		private readonly _patternEditorNext: PatternEditor = new PatternEditor(this._doc, false, 1);
 		private readonly _trackEditor: TrackEditor = new TrackEditor(this._doc, this);
 		private readonly _loopEditor: LoopEditor = new LoopEditor(this._doc);
 		private readonly _trackContainer: HTMLDivElement = div({className: "trackContainer"}, [
@@ -101,12 +103,17 @@ namespace beepbox {
 		private readonly _barScrollBar: BarScrollBar = new BarScrollBar(this._doc, this._trackContainer);
 		private readonly _octaveScrollBar: OctaveScrollBar = new OctaveScrollBar(this._doc);
 		private readonly _piano: Piano = new Piano(this._doc);
-		private readonly _editorBox: HTMLDivElement = div({}, [
-			div({className: "editorBox", style: "height: 481px; display: flex; flex-direction: row; margin-bottom: 6px;"}, [
-				this._piano.container,
-				this._patternEditor.container,
-				this._octaveScrollBar.container,
-			]),
+		private readonly _patternEditorRow: HTMLDivElement = div({className: "patternEditorRow", style: "flex: 1; height: 100%; display: flex; overflow: hidden; justify-content: center;"}, [
+			this._patternEditorPrev.container,
+			this._patternEditor.container,
+			this._patternEditorNext.container,
+		]);
+		private readonly _patternArea: HTMLDivElement = div({className: "pattern-area"}, [
+			this._piano.container,
+			this._patternEditorRow,
+			this._octaveScrollBar.container,
+		]);
+		private readonly _trackArea: HTMLDivElement = div({className: "track-area"}, [
 			this._trackContainer,
 			this._barScrollBar.container,
 		]);
@@ -205,8 +212,8 @@ namespace beepbox {
 		]);
 		private readonly _promptContainer: HTMLDivElement = div({className: "promptContainer", style: "display: none;"});
 		public readonly mainLayer: HTMLDivElement = div({className: "beepboxEditor", tabIndex: "0"}, [
-			this._editorBox,
-			div({className: "editor-widget-column"}, [
+			this._patternArea,
+			div({className: "editor-widget-column settings-area"}, [
 				div({style: "text-align: center; color: #999;"}, [text("BeepBox 2.3")]),
 				div({className: "editor-widgets"}, [
 					div({className: "editor-controls"}, [
@@ -278,6 +285,7 @@ namespace beepbox {
 					]),
 				]),
 			]),
+			this._trackArea,
 			this._promptContainer,
 		]);
 		
@@ -348,8 +356,9 @@ namespace beepbox {
 			this._instrumentTypeHint.addEventListener("click", this._openInstrumentTypePrompt);
 			this._chorusHint.addEventListener("click", this._openChorusPrompt);
 			
-			this._editorBox.addEventListener("mousedown", this._refocusStage);
+			this._patternArea.addEventListener("mousedown", this._refocusStage);
 			this.mainLayer.addEventListener("keydown", this._whenKeyPressed);
+			window.addEventListener("resize", this.whenUpdated);
 			
 			if (isMobile) (<HTMLOptionElement> this._optionsMenu.children[1]).disabled = true;
 		}
@@ -523,10 +532,23 @@ namespace beepbox {
 			this._instrumentTypeHint.style.display = (instrument.type == InstrumentType.fm) ? "" : "none";
 			this._chorusHint.style.display = (Config.chorusHarmonizes[instrument.chorus]) ? "" : "none";
 			
-			let patternWidth: number = 512;
-			if (this._doc.showLetters) patternWidth -= 32;
-			if (this._doc.showScrollBar) patternWidth -= 20;
+			const patternRowWidth: number = this._patternEditorRow.clientWidth || 1024;
+			const semitoneHeight: number = this._patternEditorRow.clientHeight / this._doc.getVisiblePitchCount();
+			const targetBeatWidth: number = semitoneHeight * 5;
+			const maxBeatWidth: number = Math.max(1, patternRowWidth / (this._doc.song.beatsPerBar * 3));
+			const beatWidth: number = Math.min(targetBeatWidth, maxBeatWidth);
+			const patternWidth: number = Math.max(1, Math.floor(beatWidth * this._doc.song.beatsPerBar));
+			this._patternEditorPrev.container.style.width = String(patternWidth) + "px";
 			this._patternEditor.container.style.width = String(patternWidth) + "px";
+			this._patternEditorNext.container.style.width = String(patternWidth) + "px";
+			this._patternEditorPrev.container.style.flexShrink = "0";
+			this._patternEditor.container.style.flexShrink = "0";
+			this._patternEditorNext.container.style.flexShrink = "0";
+			this._patternEditorPrev.container.style.display = "";
+			this._patternEditorNext.container.style.display = "";
+			this._patternEditorPrev.render();
+			this._patternEditor.render();
+			this._patternEditorNext.render();
 			
 			this._volumeSlider.value = String(this._doc.volume);
 			

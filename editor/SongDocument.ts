@@ -69,7 +69,6 @@ namespace beepbox {
 			this.showChannels = localStorage.getItem("showChannels") == "true";
 			this.showScrollBar = localStorage.getItem("showScrollBar") == "true";
 			if (localStorage.getItem("volume") != null) this.volume = Number(localStorage.getItem("volume"));
-			
 			this.synth.volume = this._calcVolume();
 			
 			let state: HistoryState | null = window.history.state;
@@ -222,13 +221,27 @@ namespace beepbox {
 			return Math.min(1.0, Math.pow(this.volume / 50.0, 0.5)) * Math.pow(2.0, (this.volume - 75.0) / 25.0);
 		}
 		
-		public getCurrentPattern(): Pattern | null {
-			return this.song.getPattern(this.channel, this.bar);
+		public getCurrentPattern(barOffset: number = 0): Pattern | null {
+			return this.song.getPattern(this.channel, this.bar + barOffset);
 		}
 		
 		public getCurrentInstrument(): number {
 			const pattern: Pattern | null = this.getCurrentPattern();
 			return pattern == null ? 0 : pattern.instrument;
+		}
+		
+		public getVisibleOctaveCount(): number {
+			return 3;
+		}
+		
+		public getVisiblePitchCount(): number {
+			return this.getVisibleOctaveCount() * 12 + 1;
+		}
+		
+		public getBaseVisibleOctave(channel: number): number {
+			if (this.song.getChannelIsDrum(channel)) return 0;
+			const maxOctave: number = Math.max(0, 7 - this.getVisibleOctaveCount());
+			return Math.max(0, Math.min(maxOctave, this.song.channels[channel].octave));
 		}
 	}
 }

@@ -254,6 +254,113 @@ styleSheet.appendChild(document.createTextNode(`
 	display: block;
 }
 
+.beepboxEditor .drum-button {
+	flex: 1;
+	background-color: transparent;
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"> \
+			<defs> \
+				<linearGradient id="gold1" x1="0%" y1="0%" x2="100%" y2="0%"> \
+					<stop offset="0%" stop-color="%237e3302"/> \
+					<stop offset="40%" stop-color="%23ffec6b"/> \
+					<stop offset="100%" stop-color="%237e3302"/> \
+				</linearGradient> \
+				<linearGradient id="gold2" x1="0%" y1="0%" x2="100%" y2="0%"> \
+					<stop offset="0%" stop-color="%23faaf7d"/> \
+					<stop offset="15%" stop-color="%23fffba9"/> \
+					<stop offset="40%" stop-color="%23ffffe3"/> \
+					<stop offset="65%" stop-color="%23fffba9"/> \
+					<stop offset="100%" stop-color="%23faaf7d"/> \
+				</linearGradient> \
+				<radialGradient id="gold3" cx="0%" cy="0%" r="100%"> \
+					<stop offset="0%" stop-color="%23ffffe3"/> \
+					<stop offset="50%" stop-color="%23ffec6b"/> \
+					<stop offset="100%" stop-color="%237e3302"/> \
+				</radialGradient> \
+				<linearGradient id="red" x1="0%" y1="0%" x2="100%" y2="0%"> \
+					<stop offset="0%" stop-color="%23641919"/> \
+					<stop offset="40%" stop-color="%23cd2c2c"/> \
+					<stop offset="100%" stop-color="%23641919"/> \
+				</linearGradient> \
+				<radialGradient id="membrane"> \
+					<stop offset="10%" stop-color="%23cccccc" /> \
+					<stop offset="90%" stop-color="%23f6f6f7" /> \
+					<stop offset="100%" stop-color="%23999" /> \
+				</radialGradient> \
+			</defs> \
+			<ellipse cx="16" cy="26" rx="16" ry="14" fill="rgba(0,0,0,0.5)"/> \
+			<ellipse cx="16" cy="25" rx="16" ry="14" fill="url(%23gold1)"/> \
+			<rect x="0" y="23" width="32" height="2" fill="url(%23gold1)"/> \
+			<ellipse cx="16" cy="23" rx="16" ry="14" fill="url(%23gold2)"/> \
+			<ellipse cx="16" cy="23" rx="15" ry="13" fill="url(%23red)"/> \
+			<rect x="1" y="17" width="30" height="6" fill="url(%23red)"/> \
+			<rect x="5" y="27" width="1" height="5" rx="0.5" fill="rgba(0,0,0,0.5)"/> \
+			<rect x="15" y="31" width="2" height="5" rx="1" fill="rgba(0,0,0,0.5)"/> \
+			<rect x="26" y="27" width="1" height="5" rx="0.5" fill="rgba(0,0,0,0.5)"/> \
+			<rect x="5" y="26" width="1" height="5" rx="0.5" fill="url(%23gold3)"/> \
+			<rect x="15" y="30" width="2" height="5" rx="1" fill="url(%23gold3)"/> \
+			<rect x="26" y="26" width="1" height="5" rx="0.5" fill="url(%23gold3)"/> \
+			<ellipse cx="16" cy="18" rx="15" ry="13" fill="rgba(0,0,0,0.5)"/> \
+			<ellipse cx="16" cy="16" rx="16" ry="14" fill="url(%23gold1)"/> \
+			<rect x="0" y="14" width="32" height="2" fill="url(%23gold1)"/> \
+			<ellipse cx="16" cy="14" rx="16" ry="14" fill="url(%23gold2)"/> \
+			<ellipse cx="16" cy="14" rx="15" ry="13" fill="url(%23membrane)"/> \
+		</svg>');
+	background-repeat: no-repeat;
+	background-position: center;
+}
+
+.beepboxEditor .piano-button {
+	flex: 1;
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.beepboxEditor .piano-button::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="15" preserveAspectRatio="none" viewBox="0 -1 32 15"> \
+			<defs> \
+				<linearGradient id="shadow" x1="0%" y1="0%" x2="100%" y2="0%"> \
+					<stop offset="0%" stop-color="rgba(0,0,0,0.5)"/> \
+					<stop offset="100%" stop-color="transparent"/> \
+				</linearGradient> \
+			</defs> \
+			<rect x="-1" y="1" width="31" height="1" rx="0.6" fill="rgba(255,255,255,0.4)"/> \
+			<path d="M -1 11 L 30 11 L 30 2 L 33 -1 L 33 14 L -1 14 z" fill="rgba(0,0,0,0.7)"/> \
+			<rect x="-1" y="-1" width="19" height="15" fill="url(%23shadow)"/> \
+		</svg>');
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 100% 115.38%;
+}
+
+.beepboxEditor .piano-button.disabled::after {
+	content: "";
+	position: absolute;
+	right: 0;
+	top: 0;
+	width: 70%;
+	height: 100%;
+	pointer-events: none;
+	background: #000;
+	-webkit-mask-image: linear-gradient(90deg, transparent 0%, gray 70%, gray 100%);
+	-webkit-mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-image: linear-gradient(90deg, transparent 0%, gray 70%, gray 100%);
+	mask-repeat: no-repeat;
+	mask-position: center;
+}
+
+.beepboxEditor .piano-button.pressed, .beepboxEditor .drum-button.pressed {
+	filter: brightness(0.5);
+}
+
 .beepboxEditor .trackContainer {
 	overflow-x: hidden;
 }
@@ -317,6 +424,19 @@ styleSheet.appendChild(document.createTextNode(`
 .beepboxEditor .editor-instrument-settings {
 	display: flex;
 	flex-direction: column;
+}
+
+.beepboxEditor .pattern-area {
+	min-width: 0;
+}
+
+.beepboxEditor .track-area {
+	min-width: 0;
+}
+
+.beepboxEditor .patternEditorRow {
+	height: 100%;
+	min-width: 0;
 }
 
 .beepboxEditor .editor-right-side-top > *, .beepboxEditor .editor-right-side-bottom > * {
@@ -412,19 +532,55 @@ styleSheet.appendChild(document.createTextNode(`
 	cursor: pointer;
 }
 
-/* wide screen */
-@media (min-width: 701px) {
-	#beepboxEditorContainer {
-		display: table;
-	}
-	.beepboxEditor {
-		flex-direction: row;
-	}
+	/* wide screen */
+	@media (min-width: 701px) {
+		#beepboxEditorContainer {
+			display: block;
+			height: 100vh;
+		}
+		.beepboxEditor {
+			display: grid;
+			width: 100%;
+			height: 100vh;
+			grid-template-columns: minmax(0, 1fr) 14em;
+			grid-template-rows: minmax(481px, 1fr) minmax(0, min-content);
+			grid-template-areas:
+				"pattern settings"
+				"track track";
+			column-gap: 6px;
+			row-gap: 6px;
+			flex-direction: unset;
+			align-items: stretch;
+		}
 	.beepboxEditor:focus-within {
 		outline: 3px solid #555;
 	}
+	.beepboxEditor .pattern-area {
+		grid-area: pattern;
+		height: 100%;
+		min-height: 481px;
+		display: flex;
+		flex-direction: row;
+		position: relative;
+		align-items: stretch;
+	}
+	.beepboxEditor .settings-area {
+		grid-area: settings;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	.beepboxEditor .track-area {
+		grid-area: track;
+		display: flex;
+		flex-direction: column;
+		min-height: 0;
+		align-self: end;
+	}
 	.beepboxEditor .trackContainer {
-		width: 512px;
+		width: 100%;
+		flex: 1;
+		min-height: 0;
+		overflow-x: hidden;
 	}
 	.beepboxEditor .trackSelectBox {
 		display: none;
@@ -452,12 +608,13 @@ styleSheet.appendChild(document.createTextNode(`
 		margin-left: 10px;
 	}
 	.beepboxEditor .editor-widget-column {
-		margin-left: 6px;
 		width: 14em;
 		flex-direction: column;
+		min-height: 0;
 	}
 	.beepboxEditor .editor-widgets {
 		flex-grow: 1;
+		min-height: 0;
 	}
 	.beepboxEditor .editor-settings input, .beepboxEditor .editor-settings select {
 		width: 8.6em;
@@ -476,6 +633,10 @@ styleSheet.appendChild(document.createTextNode(`
 @media (max-width: 700px) {
 	.beepboxEditor {
 		flex-direction: column;
+	}
+	.beepboxEditor .patternEditorRow > :first-child,
+	.beepboxEditor .patternEditorRow > :last-child {
+		display: none;
 	}
 	.beepboxEditor:focus-within {
 		outline: none;
