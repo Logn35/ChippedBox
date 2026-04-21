@@ -46,12 +46,50 @@ styleSheet.appendChild(document.createTextNode(`
 	padding: 0;
 }
 
+.beepboxEditor {
+	scrollbar-color: #444444 #000000;
+	scrollbar-width: auto;
+}
+.beepboxEditor *::-webkit-scrollbar {
+	width: 20px;
+	height: 20px;
+}
+.beepboxEditor *::-webkit-scrollbar-track {
+	background: #000000;
+}
+.beepboxEditor *::-webkit-scrollbar-thumb {
+	background-color: #444444;
+	border: 3px solid #000000;
+}
+.beepboxEditor *::-webkit-scrollbar-corner {
+	background: #000000;
+}
+.beepboxEditor *::-webkit-scrollbar-button {
+	background-color: #000000;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 10px 10px;
+}
+.beepboxEditor *::-webkit-scrollbar-button:horizontal:decrement {
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M6.8 1.5 L2.8 5 L6.8 8.5 Z" fill="white"/></svg>');
+}
+.beepboxEditor *::-webkit-scrollbar-button:horizontal:increment {
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M3.2 1.5 L7.2 5 L3.2 8.5 Z" fill="white"/></svg>');
+}
+.beepboxEditor *::-webkit-scrollbar-button:vertical:decrement {
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 6.8 L5 2.8 L8.5 6.8 Z" fill="white"/></svg>');
+}
+.beepboxEditor *::-webkit-scrollbar-button:vertical:increment {
+	background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 3.2 L5 7.2 L8.5 3.2 Z" fill="white"/></svg>');
+}
+
 .beepboxEditor .promptContainer {
 	position: absolute;
 	top: 0;
 	left: 0;
 	width: 100%;
 	height: 100%;
+	z-index: 1000;
 	background: rgba(0,0,0,0.5);
 	display: flex;
 	justify-content: center;
@@ -439,6 +477,11 @@ styleSheet.appendChild(document.createTextNode(`
 	min-width: 0;
 }
 
+.beepboxEditor .patternEditorRow > * {
+	flex: 1 1 0;
+	min-width: 0;
+}
+
 .beepboxEditor .editor-right-side-top > *, .beepboxEditor .editor-right-side-bottom > * {
 	flex-shrink: 0;
 }
@@ -542,7 +585,7 @@ styleSheet.appendChild(document.createTextNode(`
 			display: grid;
 			width: 100%;
 			height: 100vh;
-			grid-template-columns: minmax(0, 1fr) 14em;
+			grid-template-columns: minmax(0, 1fr) 390px;
 			grid-template-rows: minmax(481px, 1fr) minmax(0, min-content);
 			grid-template-areas:
 				"pattern settings"
@@ -567,10 +610,36 @@ styleSheet.appendChild(document.createTextNode(`
 	.beepboxEditor .settings-area {
 		grid-area: settings;
 		min-height: 0;
-		overflow-y: auto;
+		overflow: hidden;
+		width: 390px;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-rows: auto auto auto minmax(0, 1fr);
+		grid-template-areas:
+			"instrument-settings-area version-area"
+			"instrument-settings-area play-pause-area"
+			"instrument-settings-area menu-area"
+			"instrument-settings-area song-settings-area";
+		column-gap: 6px;
+		row-gap: 6px;
 	}
+	.beepboxEditor .settings-area > .editor-widgets {
+		display: contents;
+	}
+	.beepboxEditor .settings-area .editor-controls {
+		display: contents;
+	}
+	.beepboxEditor .settings-area .editor-settings {
+		display: contents;
+	}
+	.beepboxEditor .settings-area .version-area { grid-area: version-area; }
+	.beepboxEditor .settings-area .play-pause-area { grid-area: play-pause-area; }
+	.beepboxEditor .settings-area .menu-area { grid-area: menu-area; }
+	.beepboxEditor .settings-area .song-settings-area { grid-area: song-settings-area; overflow-y: auto; min-height: 0; }
+	.beepboxEditor .settings-area .instrument-settings-area { grid-area: instrument-settings-area; overflow-y: auto; min-height: 0; }
 	.beepboxEditor .track-area {
 		grid-area: track;
+		width: 100%;
 		display: flex;
 		flex-direction: column;
 		min-height: 0;
@@ -580,7 +649,10 @@ styleSheet.appendChild(document.createTextNode(`
 		width: 100%;
 		flex: 1;
 		min-height: 0;
-		overflow-x: hidden;
+		overflow: auto;
+	}
+	.beepboxEditor .barScrollBar {
+		display: none;
 	}
 	.beepboxEditor .trackSelectBox {
 		display: none;
@@ -608,9 +680,15 @@ styleSheet.appendChild(document.createTextNode(`
 		margin-left: 10px;
 	}
 	.beepboxEditor .editor-widget-column {
-		width: 14em;
 		flex-direction: column;
 		min-height: 0;
+	}
+	.beepboxEditor .settings-area {
+		position: relative;
+		z-index: 1;
+	}
+	.beepboxEditor .pattern-area {
+		z-index: 2;
 	}
 	.beepboxEditor .editor-widgets {
 		flex-grow: 1;

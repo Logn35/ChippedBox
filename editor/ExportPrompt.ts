@@ -231,7 +231,8 @@ namespace beepbox {
 			//console.log("export timer", (performance.now() - timer) / 1000.0);
 			
 			const srcChannelCount: number = 1;
-			const wavChannelCount: number = 1;
+			// Start with simple stereo output by duplicating the mono mix into L/R.
+			const wavChannelCount: number = 2;
 			const sampleRate: number = 44100;
 			const bytesPerSample: number = 2;
 			const bitsPerSample: number = 8 * bytesPerSample;
@@ -251,8 +252,8 @@ namespace beepbox {
 			data.setUint16(index, wavChannelCount, true); index += 2; // channel count
 			data.setUint32(index, sampleRate, true); index += 4; // sample rate
 			data.setUint32(index, sampleRate * bytesPerSample * wavChannelCount, true); index += 4; // bytes per second
-			data.setUint16(index, bytesPerSample, true); index += 2; // sample rate
-			data.setUint16(index, bitsPerSample, true); index += 2; // sample rate
+			data.setUint16(index, bytesPerSample * wavChannelCount, true); index += 2; // block align
+			data.setUint16(index, bitsPerSample, true); index += 2; // bits per sample
 			data.setUint32(index, 0x64617461, false); index += 4;
 			data.setUint32(index, sampleCount * bytesPerSample, true); index += 4;
 			let stride: number;

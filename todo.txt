@@ -1,5 +1,9 @@
 Backporting:
-- Long Layout
+√ Long Layout
+- Stereo Audio
+- Panning
+- 12 Pitch Channels
+- 4 Noise Channels
 - Drag select
 - Tempo Selection box
 - Create patterns from editing 0

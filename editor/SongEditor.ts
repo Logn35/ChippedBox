@@ -214,10 +214,10 @@ namespace beepbox {
 		public readonly mainLayer: HTMLDivElement = div({className: "beepboxEditor", tabIndex: "0"}, [
 			this._patternArea,
 			div({className: "editor-widget-column settings-area"}, [
-				div({style: "text-align: center; color: #999;"}, [text("BeepBox 2.3")]),
+				div({className: "version-area", style: "text-align: center; color: #999;"}, [text("BeepBox 2.3")]),
 				div({className: "editor-widgets"}, [
 					div({className: "editor-controls"}, [
-						div({className: "playback-controls"}, [
+						div({className: "playback-controls play-pause-area"}, [
 							div({className: "playback-bar-controls"}, [
 								this._playButton,
 								this._prevBarButton,
@@ -231,7 +231,7 @@ namespace beepbox {
 								this._volumeSlider,
 							]),
 						]),
-						div({className: "editor-menus"}, [
+						div({className: "editor-menus menu-area"}, [
 							this._newSongButton,
 							div({className: "selectContainer menu"}, [
 								this._editMenu,
@@ -251,7 +251,7 @@ namespace beepbox {
 						]),
 					]),
 					div({className: "editor-settings"}, [
-						div({className: "editor-song-settings"}, [
+						div({className: "editor-song-settings song-settings-area"}, [
 							div({style: "margin: 3px 0; text-align: center; color: #999;"}, [
 								text("Song Settings")
 							]),
@@ -276,7 +276,7 @@ namespace beepbox {
 								div({className: "selectContainer"}, [this._partSelect]),
 							]),
 						]),
-						div({className: "editor-instrument-settings"}, [
+						div({className: "editor-instrument-settings instrument-settings-area"}, [
 							div({style: "margin: 3px 0; text-align: center; color: #999;"}, [
 								text("Instrument Settings")
 							]),

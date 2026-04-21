@@ -104,7 +104,9 @@ namespace beepbox {
 		private _playheadX: number = 0.0;
 		private _octaveOffset: number = 0;
 		private _renderedWidth: number = -1;
+		private _renderedHeight: number = -1;
 		private _renderedBeatWidth: number = -1;
+		private _renderedPitchHeight: number = -1;
 		private _renderedFifths: boolean = false;
 		private _renderedDrums: boolean = false;
 		private _renderedPartsPerBeat: number = -1;
@@ -775,7 +777,9 @@ namespace beepbox {
 		private _documentChanged = (): void => {
 			const bounds: ClientRect = this.container.getBoundingClientRect();
 			const fallbackWidth: number = this._doc.showLetters ? (this._doc.showScrollBar ? 460 : 480) : (this._doc.showScrollBar ? 492 : 512);
+			const fallbackHeight: number = 481;
 			this._editorWidth = Math.max(1, Math.round(bounds.right - bounds.left) || fallbackWidth);
+			this._editorHeight = Math.max(1, Math.round(bounds.bottom - bounds.top) || fallbackHeight);
 			this._pattern = this._doc.getCurrentPattern(this._barOffset);
 			this._partWidth = this._editorWidth / (this._doc.song.beatsPerBar * this._doc.song.partsPerBeat);
 			this._pitchCount = this._doc.song.getChannelIsDrum(this._doc.channel) ? Config.drumCount : this._doc.getVisiblePitchCount();
@@ -794,21 +798,31 @@ namespace beepbox {
 			
 			this._copiedPins = this._copiedPinChannels[this._doc.channel];
 			
-			if (this._renderedWidth != this._editorWidth) {
+			if (this._renderedWidth != this._editorWidth || this._renderedHeight != this._editorHeight) {
 				this._renderedWidth = this._editorWidth;
-				//this._svg.setAttribute("width", "" + this._editorWidth);
-				this._svg.setAttribute("viewBox", "0 0 " + this._editorWidth + " 481");
+				this._renderedHeight = this._editorHeight;
+				this._svg.setAttribute("viewBox", "0 0 " + this._editorWidth + " " + this._editorHeight);
 				this._svgBackground.setAttribute("width", "" + this._editorWidth);
+				this._svgBackground.setAttribute("height", "" + this._editorHeight);
+				this._svgPlayhead.setAttribute("height", "" + this._editorHeight);
 			}
 			
 			const beatWidth = this._editorWidth / this._doc.song.beatsPerBar;
-			if (this._renderedBeatWidth != beatWidth) {
+			if (this._renderedBeatWidth != beatWidth || this._renderedPitchHeight != this._pitchHeight) {
 				this._renderedBeatWidth = beatWidth;
+				this._renderedPitchHeight = this._pitchHeight;
 				this._svgNoteBackground.setAttribute("width", "" + beatWidth);
+				this._svgNoteBackground.setAttribute("height", "" + (this._pitchHeight * 12));
 				this._svgDrumBackground.setAttribute("width", "" + beatWidth);
+				this._svgDrumBackground.setAttribute("height", "" + this._pitchHeight);
 				this._backgroundDrumRow.setAttribute("width", "" + (beatWidth - 2));
+				this._backgroundDrumRow.setAttribute("height", "" + (this._pitchHeight - 2));
 				for (let j: number = 0; j < 12; j++) {
-					this._backgroundPitchRows[j].setAttribute("width", "" + (beatWidth - 2));
+					const rectangle: SVGRectElement = this._backgroundPitchRows[j];
+					const y: number = (12 - j) % 12;
+					rectangle.setAttribute("width", "" + (beatWidth - 2));
+					rectangle.setAttribute("y", "" + (y * this._pitchHeight + 1));
+					rectangle.setAttribute("height", "" + (this._pitchHeight - 2));
 				}
 			}
 			
@@ -827,20 +841,10 @@ namespace beepbox {
 				this._backgroundPitchRows[j].style.visibility = Config.scaleFlags[this._doc.song.scale][j] ? "visible" : "hidden";
 			}
 			
-			if (this._doc.song.getChannelIsDrum(this._doc.channel)) {
-				if (!this._renderedDrums) {
-					this._renderedDrums = true;
-					this._svgBackground.setAttribute("fill", "url(#patternEditorDrumBackground" + this._barOffset + ")");
-					this._svgBackground.setAttribute("height", "" + (this._defaultDrumHeight * Config.drumCount));
-					//this._svg.setAttribute("height", "" + (this._defaultDrumHeight * Config.drumCount));
-				}
-			} else {
-				if (this._renderedDrums) {
-					this._renderedDrums = false;
-					this._svgBackground.setAttribute("fill", "url(#patternEditorNoteBackground" + this._barOffset + ")");
-					this._svgBackground.setAttribute("height", "" + this._editorHeight);
-					//this._svg.setAttribute("height", "" + this._editorHeight);
-				}
+			const isDrumChannel: boolean = this._doc.song.getChannelIsDrum(this._doc.channel);
+			if (this._renderedDrums != isDrumChannel) {
+				this._renderedDrums = isDrumChannel;
+				this._svgBackground.setAttribute("fill", isDrumChannel ? "url(#patternEditorDrumBackground" + this._barOffset + ")" : "url(#patternEditorNoteBackground" + this._barOffset + ")");
 			}
 			
 			if (this._doc.showChannels) {
