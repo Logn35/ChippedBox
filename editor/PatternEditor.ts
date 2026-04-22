@@ -583,7 +583,7 @@ namespace beepbox {
 						for (i = 0; i < this._pattern.notes.length; i++) {
 							if (this._pattern.notes[i].start >= end) break;
 						}
-						const theNote: Note = makeNote(this._cursor.pitch, start, end, 3, this._doc.song.getChannelIsDrum(this._doc.channel));
+						const theNote: Note = makeNote(this._cursor.pitch, start, end, 3, false);
 						sequence.append(new ChangeNoteAdded(this._doc, this._pattern, theNote, i));
 						this._copyPins(theNote);
 						
@@ -702,7 +702,7 @@ namespace beepbox {
 				}
 			} else if (this._mouseDown && continuousState) {
 				if (this._cursor.curNote == null) {
-					const note: Note = makeNote(this._cursor.pitch, this._cursor.start, this._cursor.end, 3, this._doc.song.getChannelIsDrum(this._doc.channel));
+					const note: Note = makeNote(this._cursor.pitch, this._cursor.start, this._cursor.end, 3, false);
 					note.pins = [];
 					for (const oldPin of this._cursor.pins) {
 						note.pins.push(makeNotePin(0, oldPin.time, oldPin.volume));

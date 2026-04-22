@@ -1,7 +1,3 @@
-# BeepBox 2.3.1 modding notes
-
-This repo is set up to be easy to edit and test locally.
-
 ## One-time setup
 
 - Install local dev tooling: `npm install`

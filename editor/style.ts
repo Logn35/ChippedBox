@@ -464,6 +464,49 @@ styleSheet.appendChild(document.createTextNode(`
 	flex-direction: column;
 }
 
+.beepboxEditor .instrument-settings-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	column-gap: 6px;
+	align-content: start;
+}
+
+/* Default all controls into the left column to preserve the previous appearance. */
+.beepboxEditor .instrument-settings-grid > * {
+	grid-column: 1;
+}
+
+/* "2x2" groups span both outer columns and manage their own internal layout. */
+.beepboxEditor .instrument-settings-grid > .instrument-settings-2x2 {
+	grid-column: 1 / -1;
+}
+
+.beepboxEditor .instrument-settings-2x2 {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+	grid-template-rows: auto auto;
+	column-gap: 6px;
+	row-gap: 6px;
+	align-content: start;
+}
+
+.beepboxEditor .instrument-settings-2x2 > .selectRow {
+	margin: 0;
+}
+
+.beepboxEditor .instrument-settings-columns {
+	display: flex;
+	flex-direction: row;
+	gap: 6px;
+}
+
+.beepboxEditor .instrument-settings-column {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 0;
+	min-width: 0;
+}
+
 .beepboxEditor .pattern-area {
 	min-width: 0;
 }
@@ -585,7 +628,7 @@ styleSheet.appendChild(document.createTextNode(`
 			display: grid;
 			width: 100%;
 			height: 100vh;
-			grid-template-columns: minmax(0, 1fr) 390px;
+			grid-template-columns: minmax(0, 1fr) 645px;
 			grid-template-rows: minmax(481px, 1fr) minmax(0, min-content);
 			grid-template-areas:
 				"pattern settings"
@@ -611,9 +654,9 @@ styleSheet.appendChild(document.createTextNode(`
 		grid-area: settings;
 		min-height: 0;
 		overflow: hidden;
-		width: 390px;
+		width: 100%;
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 		grid-template-rows: auto auto auto minmax(0, 1fr);
 		grid-template-areas:
 			"instrument-settings-area version-area"
@@ -695,7 +738,11 @@ styleSheet.appendChild(document.createTextNode(`
 		min-height: 0;
 	}
 	.beepboxEditor .editor-settings input, .beepboxEditor .editor-settings select {
-		width: 8.6em;
+		width: 10em;
+	}
+	.beepboxEditor .editor-settings input[type="checkbox"] {
+		width: auto;
+		flex: 0 0 auto;
 	}
 	.beepboxEditor .editor-menus > * {
 		flex-grow: 1;
@@ -773,6 +820,10 @@ styleSheet.appendChild(document.createTextNode(`
 	}
 	.beepboxEditor .editor-settings input, .beepboxEditor .editor-settings .selectContainer {
 		width: 60%;
+	}
+	.beepboxEditor .editor-settings input[type="checkbox"] {
+		width: auto;
+		flex: 0 0 auto;
 	}
 	.beepboxEditor .editor-settings select {
 		width: 100%;

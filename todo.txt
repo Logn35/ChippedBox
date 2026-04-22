@@ -1,6 +1,6 @@
 Backporting:
 √ Long Layout
-- Stereo Audio
+√ Stereo Audio
 - Panning
 - 12 Pitch Channels
 - 4 Noise Channels
@@ -9,8 +9,24 @@ Backporting:
 - Create patterns from editing 0
 - Pitch shift by octave
 - Enter and Backspace to remove bars
+- Muting
 - S to solo
 - N to give next available pattern
 - Piano usable while paused
 - Hear Preview of Added Notes
 - Recreate ModBox Type A Mixing
+
+Features:
+√ Remove built in note fade.
+- 2a03:
+    √ Duty 
+    √ Volume
+    √ Pitch
+    - Hi-Pitch
+    √ Pulse Wave
+    √ Triangle Wave
+    √ NES Filter
+    - Step Time
+    - Tempo Sync
+    - Loop Point
+- Header

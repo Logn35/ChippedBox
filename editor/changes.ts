@@ -101,11 +101,308 @@ namespace beepbox {
 	}
 	
 	export class ChangeInstrumentType extends Change {
+		constructor(doc: SongDocument, newValue: InstrumentType) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const oldValue: InstrumentType = instrument.type;
+			if (oldValue != newValue) {
+				instrument.setTypeAndReset(newValue);
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+	
+	export class ChangePulseWidth extends Change {
 		constructor(doc: SongDocument, newValue: number) {
 			super();
-			const oldValue: number = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].type;
-			if (oldValue != newValue) {
-				doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].type = newValue
+			// "Pulse Width" is stored in the instrument's wave field for the Pulse instrument type.
+			if (doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].wave != newValue) {
+				doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].wave = newValue;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+	
+	export class ChangePulseSequence extends Change {
+		constructor(doc: SongDocument, oldSequence: ReadonlyArray<number>, newSequence: ReadonlyArray<number>) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			let same: boolean = (oldSequence.length == newSequence.length);
+			if (same) {
+				for (let i: number = 0; i < newSequence.length; i++) {
+					if (oldSequence[i] != newSequence[i]) { same = false; break; }
+				}
+			}
+			
+			// Apply regardless (keeps preview responsive), but mark no-op if unchanged.
+			for (let i: number = 0; i < instrument.pulseSequence.length; i++) {
+				instrument.pulseSequence[i] = Math.max(0, Math.min(Config.pulseWidthRange - 1, newSequence[i] | 0));
+			}
+			instrument.wave = instrument.pulseSequence[0] | 0;
+			doc.notifier.changed();
+			if (!same) this._didSomething();
+		}
+	}
+	
+	export class ChangePulseVolumeSequence extends Change {
+		constructor(doc: SongDocument, oldSequence: ReadonlyArray<number>, newSequence: ReadonlyArray<number>) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			let same: boolean = (oldSequence.length == newSequence.length);
+			if (same) {
+				for (let i: number = 0; i < newSequence.length; i++) {
+					if (oldSequence[i] != newSequence[i]) { same = false; break; }
+				}
+			}
+			
+			for (let i: number = 0; i < instrument.pulseVolumeSequence.length; i++) {
+				instrument.pulseVolumeSequence[i] = Math.max(0, Math.min(Config.pulseVolumeMax, newSequence[i] | 0));
+			}
+			doc.notifier.changed();
+			if (!same) this._didSomething();
+		}
+	}
+
+	export class ChangePulsePitchSequence extends Change {
+		constructor(doc: SongDocument, oldSequence: ReadonlyArray<number>, newSequence: ReadonlyArray<number>) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			let same: boolean = true;
+			for (let i: number = 0; i < instrument.pulsePitchSequence.length; i++) {
+				if ((oldSequence[i] | 0) != (newSequence[i] | 0)) { same = false; break; }
+			}
+			for (let i: number = 0; i < instrument.pulsePitchSequence.length; i++) {
+				instrument.pulsePitchSequence[i] = Math.max(0, Math.min(Config.pulsePitchRange - 1, newSequence[i] | 0));
+			}
+			doc.notifier.changed();
+			if (!same) this._didSomething();
+		}
+	}
+
+	export class ChangePulseHiPitchSequence extends Change {
+		constructor(doc: SongDocument, oldSequence: ReadonlyArray<number>, newSequence: ReadonlyArray<number>) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			let same: boolean = true;
+			for (let i: number = 0; i < instrument.pulseHiPitchSequence.length; i++) {
+				if ((oldSequence[i] | 0) != (newSequence[i] | 0)) { same = false; break; }
+			}
+			for (let i: number = 0; i < instrument.pulseHiPitchSequence.length; i++) {
+				instrument.pulseHiPitchSequence[i] = Math.max(0, Math.min(Config.pulseHiPitchRange - 1, newSequence[i] | 0));
+			}
+			doc.notifier.changed();
+			if (!same) this._didSomething();
+		}
+	}
+	
+	export class ChangePulseDutyText extends Change {
+		constructor(doc: SongDocument, text: string) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const matches: RegExpMatchArray | null = text.match(/-?\d+/g);
+			if (matches == null || matches.length == 0) return;
+			
+			const steps: number = Math.max(1, Math.min(Config.pulseStepsMax, matches.length));
+			instrument.pulseSteps = steps;
+			for (let i: number = 0; i < steps; i++) {
+				let value: number = parseInt(matches[i], 10);
+				if (isNaN(value)) value = 0;
+				if (value < 0) value = 0;
+				if (value > Config.pulseWidthRange - 1) value = Config.pulseWidthRange - 1;
+				instrument.pulseSequence[i] = value;
+			}
+			instrument.wave = instrument.pulseSequence[0] | 0;
+			doc.notifier.changed();
+			this._didSomething();
+		}
+	}
+	
+	export class ChangePulseVolumeText extends Change {
+		constructor(doc: SongDocument, text: string) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const matches: RegExpMatchArray | null = text.match(/-?\d+/g);
+			if (matches == null || matches.length == 0) return;
+			
+			const steps: number = Math.max(1, Math.min(Config.pulseStepsMax, matches.length));
+			instrument.pulseVolumeSteps = steps;
+			for (let i: number = 0; i < steps; i++) {
+				let value: number = parseInt(matches[i], 10);
+				if (isNaN(value)) value = Config.pulseVolumeMax;
+				if (value < 0) value = 0;
+				if (value > Config.pulseVolumeMax) value = Config.pulseVolumeMax;
+				instrument.pulseVolumeSequence[i] = value;
+			}
+			doc.notifier.changed();
+			this._didSomething();
+		}
+	}
+
+	export class ChangePulsePitchText extends Change {
+		constructor(doc: SongDocument, text: string) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const matches: RegExpMatchArray | null = text.match(/-?\d+/g);
+			if (matches == null || matches.length == 0) return;
+			
+			const steps: number = Math.max(1, Math.min(Config.pulseStepsMax, matches.length));
+			instrument.pulsePitchSteps = steps;
+			for (let i: number = 0; i < steps; i++) {
+				let offset: number = parseInt(matches[i], 10);
+				if (isNaN(offset)) offset = 0;
+				offset = Math.max(-8, Math.min(8, offset));
+				instrument.pulsePitchSequence[i] = Math.max(0, Math.min(Config.pulsePitchRange - 1, (offset + Config.pulsePitchCenter) | 0));
+			}
+			doc.notifier.changed();
+			this._didSomething();
+		}
+	}
+	
+	export class ChangePulseSteps extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(1, Math.min(Config.pulseStepsMax, newValue | 0));
+			if (instrument.pulseSteps != clamped) {
+				instrument.pulseSteps = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+	
+	export class ChangePulseVolumeSteps extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(1, Math.min(Config.pulseStepsMax, newValue | 0));
+			if (instrument.pulseVolumeSteps != clamped) {
+				instrument.pulseVolumeSteps = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulsePitchSteps extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(1, Math.min(Config.pulseStepsMax, newValue | 0));
+			if (instrument.pulsePitchSteps != clamped) {
+				instrument.pulsePitchSteps = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseHiPitchSteps extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(1, Math.min(Config.pulseStepsMax, newValue | 0));
+			if (instrument.pulseHiPitchSteps != clamped) {
+				instrument.pulseHiPitchSteps = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseDutyTick extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(0, Math.min(Config.pulseTickMsOptions.length - 1, newValue | 0));
+			if (instrument.pulseDutyTick != clamped) {
+				instrument.pulseDutyTick = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseVolumeTick extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(0, Math.min(Config.pulseTickMsOptions.length - 1, newValue | 0));
+			if (instrument.pulseVolumeTick != clamped) {
+				instrument.pulseVolumeTick = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulsePitchTick extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(0, Math.min(Config.pulseTickMsOptions.length - 1, newValue | 0));
+			if (instrument.pulsePitchTick != clamped) {
+				instrument.pulsePitchTick = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseHiPitchTick extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(0, Math.min(Config.pulseTickMsOptions.length - 1, newValue | 0));
+			if (instrument.pulseHiPitchTick != clamped) {
+				instrument.pulseHiPitchTick = clamped;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseHiPitchText extends Change {
+		constructor(doc: SongDocument, text: string) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const matches: RegExpMatchArray | null = text.match(/-?\d+/g);
+			if (matches == null || matches.length == 0) return;
+			
+			const steps: number = Math.max(1, Math.min(Config.pulseStepsMax, matches.length));
+			instrument.pulseHiPitchSteps = steps;
+			for (let i: number = 0; i < steps; i++) {
+				let offset: number = parseInt(matches[i], 10);
+				if (isNaN(offset)) offset = 0;
+				offset = Math.max(-12, Math.min(12, offset));
+				instrument.pulseHiPitchSequence[i] = Math.max(0, Math.min(Config.pulseHiPitchRange - 1, (offset + Config.pulseHiPitchCenter) | 0));
+			}
+			doc.notifier.changed();
+			this._didSomething();
+		}
+	}
+	
+	export class ChangePulseNesAccurate extends Change {
+		constructor(doc: SongDocument, newValue: boolean) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			if (instrument.pulseNesAccurate != newValue) {
+				instrument.pulseNesAccurate = newValue;
+				doc.notifier.changed();
+				this._didSomething();
+			}
+		}
+	}
+
+	export class ChangePulseWaveform extends Change {
+		constructor(doc: SongDocument, newValue: number) {
+			super();
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const clamped: number = Math.max(0, Math.min(1, newValue | 0));
+			if (instrument.pulseWaveform != clamped) {
+				instrument.pulseWaveform = clamped;
 				doc.notifier.changed();
 				this._didSomething();
 			}
