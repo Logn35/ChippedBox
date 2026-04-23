@@ -1,5 +1,6 @@
 Backporting:
 √ Long Layout
+    - Fix bugs
 √ Stereo Audio
 - Panning
 - 12 Pitch Channels
@@ -18,15 +19,18 @@ Backporting:
 
 Features:
 √ Remove built in note fade.
+- Portamento
 - 2a03:
     √ Duty 
     √ Volume
     √ Pitch
-    - Hi-Pitch
+    √ Hi-Pitch
     √ Pulse Wave
     √ Triangle Wave
     √ NES Filter
-    - Step Time
+    √ Step Time
     - Tempo Sync
     - Loop Point
+- 2a03 (noise)
+- VRC6
 - Header

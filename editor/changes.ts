@@ -117,8 +117,11 @@ namespace beepbox {
 		constructor(doc: SongDocument, newValue: number) {
 			super();
 			// "Pulse Width" is stored in the instrument's wave field for the Pulse instrument type.
-			if (doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].wave != newValue) {
-				doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()].wave = newValue;
+			const instrument: Instrument = doc.song.channels[doc.channel].instruments[doc.getCurrentInstrument()];
+			const widthRange: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
+			const clamped: number = Math.max(0, Math.min(widthRange - 1, newValue | 0));
+			if (instrument.wave != clamped) {
+				instrument.wave = clamped;
 				doc.notifier.changed();
 				this._didSomething();
 			}
@@ -137,8 +140,9 @@ namespace beepbox {
 			}
 			
 			// Apply regardless (keeps preview responsive), but mark no-op if unchanged.
+			const widthRange: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
 			for (let i: number = 0; i < instrument.pulseSequence.length; i++) {
-				instrument.pulseSequence[i] = Math.max(0, Math.min(Config.pulseWidthRange - 1, newSequence[i] | 0));
+				instrument.pulseSequence[i] = Math.max(0, Math.min(widthRange - 1, newSequence[i] | 0));
 			}
 			instrument.wave = instrument.pulseSequence[0] | 0;
 			doc.notifier.changed();
@@ -210,7 +214,8 @@ namespace beepbox {
 				let value: number = parseInt(matches[i], 10);
 				if (isNaN(value)) value = 0;
 				if (value < 0) value = 0;
-				if (value > Config.pulseWidthRange - 1) value = Config.pulseWidthRange - 1;
+				const widthRange: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
+				if (value > widthRange - 1) value = widthRange - 1;
 				instrument.pulseSequence[i] = value;
 			}
 			instrument.wave = instrument.pulseSequence[0] | 0;

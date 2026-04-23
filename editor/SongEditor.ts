@@ -105,10 +105,11 @@ namespace beepbox {
 		private _sequence: number[] | null = null;
 		
 		private readonly _editorWidth: number = Config.pulseStepsMax * 12;
-		private readonly _editorHeight: number = Config.pulseWidthRange * 16;
-		private readonly _verticalLines: SVGLineElement[] = [];
-		private readonly _hoverHighlight: SVGRectElement = <SVGRectElement> svgElement("rect", {x: 0, y: 0, width: 1, height: this._editorHeight, fill: "#ffffff", opacity: "0.12", "pointer-events": "none", style: "display: none;"});
-		private readonly _fills: SVGRectElement[] = [];
+		private _values: number = Config.pulseWidthRange;
+		private _editorHeight: number = this._values * 16;
+		private _verticalLines: SVGLineElement[] = [];
+		private _hoverHighlight: SVGRectElement | null = null;
+		private _fills: SVGRectElement[] = [];
 		private readonly _svg: SVGSVGElement = <SVGSVGElement> svgElement("svg", {
 			style: "background-color: #000000; touch-action: none; overflow: visible; shape-rendering: crispEdges;",
 			width: "100%",
@@ -121,8 +122,31 @@ namespace beepbox {
 		public readonly container: HTMLDivElement = div({style: "position: relative; flex: 1; min-height: 0; width: 100%; background: #000; border: 2px solid #333; box-sizing: border-box; padding: 2px;"}, [this._svg, this._disabledOverlay]);
 		
 		constructor(private readonly _doc: SongDocument) {
-			const values: number = Config.pulseWidthRange;
-			const segments: number = Math.max(1, values - 1);
+			this._rebuildSvg(this._values);
+			
+			this.container.addEventListener("mousedown", this._whenMousePressed);
+			this.container.addEventListener("mousemove", this._whenMouseHoverMoved);
+			this.container.addEventListener("mouseleave", this._whenMouseHoverLeft);
+			document.addEventListener("mousemove", this._whenMouseMoved);
+			document.addEventListener("mouseup", this._whenMouseReleased);
+			
+			this.container.addEventListener("touchstart", this._whenTouchPressed, {passive: false});
+			this.container.addEventListener("touchmove", this._whenTouchMoved, {passive: false});
+			this.container.addEventListener("touchend", this._whenMouseReleased);
+			this.container.addEventListener("touchcancel", this._whenMouseReleased);
+		}
+		
+		private _rebuildSvg(values: number): void {
+			this._values = values;
+			this._editorHeight = this._values * 16;
+			this._svg.setAttribute("viewBox", `0 0 ${this._editorWidth} ${this._editorHeight}`);
+			
+			while (this._svg.firstChild) this._svg.removeChild(this._svg.firstChild);
+			this._verticalLines = [];
+			this._fills = [];
+			this._hoverHighlight = <SVGRectElement> svgElement("rect", {x: 0, y: 0, width: 1, height: this._editorHeight, fill: "#ffffff", opacity: "0.12", "pointer-events": "none", style: "display: none;"});
+			
+			const segments: number = Math.max(1, this._values - 1);
 			const cols: number = Config.pulseStepsMax;
 			const segmentHeight: number = this._editorHeight / segments;
 			
@@ -136,7 +160,7 @@ namespace beepbox {
 			}
 			for (let r: number = 1; r < segments; r++) {
 				const y: number = r * segmentHeight;
-				this._svg.appendChild(svgElement("rect", {x: 0, y, width: this._editorWidth, height: 1, fill: "#222"}));
+				this._svg.appendChild(svgElement("line", {x1: 0, y1: y, x2: this._editorWidth, y2: y, stroke: "#222", "stroke-width": 1, "vector-effect": "non-scaling-stroke"}));
 			}
 			
 			// Hover highlight (behind fills).
@@ -154,46 +178,36 @@ namespace beepbox {
 				this._fills[c] = rect;
 				this._svg.appendChild(rect);
 			}
-			
-			this.container.addEventListener("mousedown", this._whenMousePressed);
-			this.container.addEventListener("mousemove", this._whenMouseHoverMoved);
-			this.container.addEventListener("mouseleave", this._whenMouseHoverLeft);
-			document.addEventListener("mousemove", this._whenMouseMoved);
-			document.addEventListener("mouseup", this._whenMouseReleased);
-			
-			this.container.addEventListener("touchstart", this._whenTouchPressed, {passive: false});
-			this.container.addEventListener("touchmove", this._whenTouchMoved, {passive: false});
-			this.container.addEventListener("touchend", this._whenMouseReleased);
-			this.container.addEventListener("touchcancel", this._whenMouseReleased);
 		}
 
 		public setEnabled(enabled: boolean): void {
 			this._enabled = enabled;
 			this._disabledOverlay.style.display = enabled ? "none" : "flex";
 			this.container.style.opacity = enabled ? "" : "0.65";
-			if (!enabled) {
-				this._mouseDown = false;
-				this._hoverColumn = -1;
-				this._hoverHighlight.style.display = "none";
+				if (!enabled) {
+					this._mouseDown = false;
+					this._hoverColumn = -1;
+					this._hoverHighlight!.style.display = "none";
+				}
 			}
-		}
 		
 		public render(sequence: ReadonlyArray<number>, color: string): void {
-			const values: number = Config.pulseWidthRange;
-			const segments: number = Math.max(1, values - 1);
 			const instrument: Instrument = this._doc.song.channels[this._doc.channel].instruments[this._doc.getCurrentInstrument()];
+			const values: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
+			if (values != this._values) this._rebuildSvg(values);
+			const segments: number = Math.max(1, values - 1);
 			const steps: number = Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulseSteps | 0));
 			const cellWidth: number = this._editorWidth / steps;
 			
 			// Update hover highlight to match current step grid.
 			if (this._hoverColumn >= 0 && this._hoverColumn < steps) {
-				this._hoverHighlight.setAttribute("x", "" + (this._hoverColumn * cellWidth));
-				this._hoverHighlight.setAttribute("width", "" + cellWidth);
-				this._hoverHighlight.setAttribute("y", "" + this._hoverFillY);
-				this._hoverHighlight.setAttribute("height", "" + this._hoverFillHeight);
-				this._hoverHighlight.style.display = "";
+				this._hoverHighlight!.setAttribute("x", "" + (this._hoverColumn * cellWidth));
+				this._hoverHighlight!.setAttribute("width", "" + cellWidth);
+				this._hoverHighlight!.setAttribute("y", "" + this._hoverFillY);
+				this._hoverHighlight!.setAttribute("height", "" + this._hoverFillHeight);
+				this._hoverHighlight!.style.display = "";
 			} else {
-				this._hoverHighlight.style.display = "none";
+				this._hoverHighlight!.style.display = "none";
 			}
 			
 			for (let c: number = 1; c < Config.pulseStepsMax; c++) {
@@ -247,7 +261,7 @@ namespace beepbox {
 			y = Math.max(0, Math.min(0.999999, y));
 			
 			const column: number = Math.min(steps - 1, Math.floor(x * steps));
-			const values: number = Config.pulseWidthRange;
+			const values: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
 			const value: number = Math.max(0, Math.min(values - 1, Math.round((1.0 - y) * (values - 1))));
 			
 			const sequence: number[] = this._sequence!;
@@ -281,7 +295,7 @@ namespace beepbox {
 			this._hoverColumn = column;
 			
 			// Quantize to valid duty-cycle levels (same mapping as editing).
-			const values: number = Config.pulseWidthRange;
+			const values: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
 			const segments: number = Math.max(1, values - 1);
 			const value: number = Math.max(0, Math.min(values - 1, Math.round((1.0 - y) * (values - 1))));
 			const filledHeight: number = this._editorHeight * value / segments;
@@ -289,11 +303,11 @@ namespace beepbox {
 			this._hoverFillHeight = filledHeight;
 			
 			const cellWidth: number = this._editorWidth / steps;
-			this._hoverHighlight.setAttribute("x", "" + (column * cellWidth));
-			this._hoverHighlight.setAttribute("width", "" + cellWidth);
-			this._hoverHighlight.setAttribute("y", "" + this._hoverFillY);
-			this._hoverHighlight.setAttribute("height", "" + this._hoverFillHeight);
-			this._hoverHighlight.style.display = "";
+			this._hoverHighlight!.setAttribute("x", "" + (column * cellWidth));
+			this._hoverHighlight!.setAttribute("width", "" + cellWidth);
+			this._hoverHighlight!.setAttribute("y", "" + this._hoverFillY);
+			this._hoverHighlight!.setAttribute("height", "" + this._hoverFillHeight);
+			this._hoverHighlight!.style.display = "";
 		}
 		
 		private _whenMouseHoverMoved = (event: MouseEvent): void => {
@@ -304,7 +318,7 @@ namespace beepbox {
 		
 		private _whenMouseHoverLeft = (): void => {
 			this._hoverColumn = -1;
-			this._hoverHighlight.style.display = "none";
+			this._hoverHighlight!.style.display = "none";
 		}
 		
 		private _whenMousePressed = (event: MouseEvent): void => {
@@ -1138,6 +1152,7 @@ namespace beepbox {
 			option("pulse", "pulse", true, false),
 			option("triangle", "triangle", false, false),
 		]);
+		private _pulseWaveSelectType: InstrumentType | null = null;
 		private readonly _pulseWaveSelectRow: HTMLDivElement = div({className: "selectRow"}, [
 			span({}, [text("Wave: ")]),
 			div({className: "selectContainer"}, [this._pulseWaveSelect]),
@@ -1164,13 +1179,8 @@ namespace beepbox {
 			private readonly _pulseVolumeTextInput: HTMLInputElement = input({type: "text", style: "width: 100%; margin: 4px 0 0 0; box-sizing: border-box; background: #000; border: 1px solid #333; color: #999; font-size: .85em; padding: 2px 4px;"});
 			private readonly _pulsePitchTextInput: HTMLInputElement = input({type: "text", style: "width: 100%; margin: 4px 0 0 0; box-sizing: border-box; background: #000; border: 1px solid #333; color: #999; font-size: .85em; padding: 2px 4px;"});
 			private readonly _pulseHiPitchTextInput: HTMLInputElement = input({type: "text", style: "width: 100%; margin: 4px 0 0 0; box-sizing: border-box; background: #000; border: 1px solid #333; color: #999; font-size: .85em; padding: 2px 4px;"});
-				private readonly _pulseDutyLabels: HTMLDivElement = (() => {
-					const labels: Node[] = [];
-					for (let i: number = Config.pulseWidthRange - 1; i >= 0; i--) {
-						labels.push(span({style: "display: block;"}, [text(formatPercent(Config.getPulseWidthRatio(i)))]));
-					}
-				return div({style: "width: 3.1em; flex: 0 0 auto; padding-right: .55em; box-sizing: border-box; font-size: .7em; line-height: 1; color: #999; text-align: right; display: flex; flex-direction: column; justify-content: space-between;"}, labels);
-			})();
+			private _pulseDutyLabelsType: InstrumentType | null = null;
+			private readonly _pulseDutyLabels: HTMLDivElement = div({style: "width: 3.1em; flex: 0 0 auto; padding-right: .55em; box-sizing: border-box; font-size: .7em; line-height: 1; color: #999; text-align: right; display: flex; flex-direction: column; justify-content: space-between;"});
 			private readonly _pulseWidthRow: HTMLDivElement = div(
 				{
 					className: "selectRow",
@@ -1352,14 +1362,14 @@ namespace beepbox {
 						this._pulseChorusSelectRow,
 					]),
 					div({style: "grid-column: 1; grid-row: 2; display: flex; flex-direction: column;"}, [
-						this._pulseVolumeRow,
-						this._pulseVolumeStepsRow,
-						this._pulseVolumeTickRow,
-					]),
-					div({style: "grid-column: 2; grid-row: 2; display: flex; flex-direction: column;"}, [
 						this._pulseWidthRow,
 						this._pulseStepsRow,
 						this._pulseDutyTickRow,
+					]),
+					div({style: "grid-column: 2; grid-row: 2; display: flex; flex-direction: column;"}, [
+						this._pulseVolumeRow,
+						this._pulseVolumeStepsRow,
+						this._pulseVolumeTickRow,
 					]),
 					div({style: "grid-column: 1; grid-row: 3; display: flex; flex-direction: column;"}, [
 						this._pulseHiPitchRow,
@@ -1571,6 +1581,29 @@ namespace beepbox {
 
 		private _whenSetPulseWaveform = (): void => {
 			this._doc.record(new ChangePulseWaveform(this._doc, this._pulseWaveSelect.selectedIndex));
+		}
+		
+		private _renderPulseWaveOptions(instrumentType: InstrumentType): void {
+			if (this._pulseWaveSelectType == instrumentType) return;
+			this._pulseWaveSelectType = instrumentType;
+			
+			while (this._pulseWaveSelect.firstChild) this._pulseWaveSelect.removeChild(this._pulseWaveSelect.firstChild);
+			this._pulseWaveSelect.appendChild(option("pulse", "pulse", true, false));
+			if (instrumentType == InstrumentType.vrc6) {
+				this._pulseWaveSelect.appendChild(option("sawtooth", "sawtooth", false, false));
+			} else {
+				this._pulseWaveSelect.appendChild(option("triangle", "triangle", false, false));
+			}
+		}
+		
+		private _renderPulseDutyLabels(instrumentType: InstrumentType): void {
+			if (this._pulseDutyLabelsType == instrumentType) return;
+			this._pulseDutyLabelsType = instrumentType;
+			while (this._pulseDutyLabels.firstChild) this._pulseDutyLabels.removeChild(this._pulseDutyLabels.firstChild);
+			const values: number = Config.getPulseWidthRangeForInstrumentType(instrumentType);
+			for (let i: number = values - 1; i >= 0; i--) {
+				this._pulseDutyLabels.appendChild(span({style: "display: block;"}, [text(formatPercent(Config.getPulseWidthRatioForInstrumentType(instrumentType, i)))]));
+			}
 		}
 		
 		constructor(private _doc: SongDocument) {
@@ -1803,13 +1836,15 @@ namespace beepbox {
 						this._phaseModGroup.style.display = "none";
 					this._feedbackRow1.style.display = "none";
 					this._feedbackRow2.style.display = "none";
-					} else if (instrument.type == InstrumentType.pulse) {
+					} else if (Config.isPulseLikeInstrumentType(instrument.type)) {
 						this._instrumentVolumeSliderRow.style.display = "";
 						this._waveSelectRow.style.display = "none";
 						this._pulseWaveSelectRow.style.display = "";
+						this._renderPulseWaveOptions(instrument.type);
 						this._pulseNesAccurateRow.style.display = "";
 						this._pulseDutyCycleGrid.style.display = "";
 						const isTriangle: boolean = (instrument.pulseWaveform == 1);
+						this._renderPulseDutyLabels(instrument.type);
 						this._pulseWidthRow.style.display = "";
 						this._pulseStepsRow.style.display = "";
 						this._pulseVolumeRow.style.display = "";

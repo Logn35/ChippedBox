@@ -53,6 +53,7 @@ namespace beepbox {
 		fm = 1,
 		noise = 2,
 		pulse = 3,
+		vrc6 = 4,
 	}
 	
 	export class Config {
@@ -116,7 +117,7 @@ namespace beepbox {
 		public static readonly filterBases: ReadonlyArray<number> = [0.0, 2.0, 3.5, 5.0, 1.0, 2.5, 4.0];
 		public static readonly filterDecays: ReadonlyArray<number> = [0.0, 0.0, 0.0, 0.0, 10.0, 7.0, 4.0];
 		public static readonly filterVolumes: ReadonlyArray<number> = [0.2, 0.4, 0.7, 1.0, 0.5, 0.75, 1.0];
-		public static readonly transitionNames: ReadonlyArray<string> = ["seamless", "sudden", "smooth", "slide"];
+		public static readonly transitionNames: ReadonlyArray<string> = ["seamless", "sudden", "smooth", "slide", "portamento"];
 		public static readonly effectNames: ReadonlyArray<string> = ["none", "vibrato light", "vibrato delayed", "vibrato heavy", "tremolo light", "tremolo heavy"];
 		public static readonly effectVibratos: ReadonlyArray<number> = [0.0, 0.15, 0.3, 0.45, 0.0, 0.0];
 		public static readonly effectTremolos: ReadonlyArray<number> = [0.0, 0.0, 0.0, 0.0, 0.25, 0.5];
@@ -250,11 +251,11 @@ namespace beepbox {
 		];
 		// For pitch channels, we expose a curated set of instrument types in the editor UI.
 		// These indices are not guaranteed to match the InstrumentType enum values.
-		public static readonly pitchChannelTypeNames: ReadonlyArray<string> = ["chip", "2A03", "FM (expert)"];
-		public static readonly pitchChannelTypeValues: ReadonlyArray<InstrumentType> = [InstrumentType.chip, InstrumentType.pulse, InstrumentType.fm];
+		public static readonly pitchChannelTypeNames: ReadonlyArray<string> = ["chip", "2A03", "VRC6", "FM (expert)"];
+		public static readonly pitchChannelTypeValues: ReadonlyArray<InstrumentType> = [InstrumentType.chip, InstrumentType.pulse, InstrumentType.vrc6, InstrumentType.fm];
 		
 		// For JSON import/export, these names correspond directly to InstrumentType enum values.
-		public static readonly instrumentTypeNames: ReadonlyArray<string> = ["chip", "FM", "noise", "pulse"];
+		public static readonly instrumentTypeNames: ReadonlyArray<string> = ["chip", "FM", "noise", "pulse", "vrc6"];
 		public static readonly pitchChannelColorsDim: ReadonlyArray<string>    = ["#0099a1", "#a1a100", "#c75000", "#00a100", "#d020d0", "#7777b0"];
 		public static readonly pitchChannelColorsBright: ReadonlyArray<string> = ["#25f3ff", "#ffff25", "#ff9752", "#50ff50", "#ff90ff", "#a0a0ff"];
 		public static readonly pitchNoteColorsDim: ReadonlyArray<string>       = ["#00bdc7", "#c7c700", "#ff771c", "#00c700", "#e040e0", "#8888d0"];
@@ -308,6 +309,7 @@ namespace beepbox {
 		];
 		
 		public static readonly pulseWidthRange: number = 4;
+		public static readonly vrc6PulseWidthRange: number = 8;
 		public static readonly pulseVolumeRange: number = 16;
 		public static readonly pulseVolumeMax: number = Config.pulseVolumeRange - 1;
 		public static readonly pulsePitchRange: number = 17; // 17 levels: -1..+1 semitone in 1/8 steps.
@@ -321,7 +323,7 @@ namespace beepbox {
 		public static readonly pulseStepsMax: number = 64;
 		public static readonly pulseStepsMaxLegacy: number = 12;
 		public static readonly pulseSequenceLengthLegacy: number = 16;
-		public static readonly pulseVolumeBoost: number = 4;
+		public static readonly pulseVolumeBoost: number = 5;
 		public static readonly pulseTriangleVolumeBoost: number = 0.8;
 		public static readonly nesCpuFrequencyHz: number = 1789773; // NTSC 2A03 CPU clock.
 		private static readonly _pulseWaves: Array<Float64Array | null> = (() => {
@@ -330,11 +332,63 @@ namespace beepbox {
 			return waves;
 		})();
 		
+		public static readonly vrc6SawWave: Float64Array = (() => {
+			// Approximate VRC6 saw as a 14-step rising staircase, centered and normalized.
+			// This focuses on waveform generation shape (not hardware clocking/volume units).
+			const steps: number = 14;
+			const length: number = 64;
+			const samples: number[] = [];
+			for (let i: number = 0; i < length; i++) {
+				const step: number = Math.min(steps - 1, Math.floor(i * steps / length));
+				const v: number = (step / (steps - 1)) * 2.0 - 1.0;
+				samples[i] = v;
+			}
+			const wave: Float64Array = Config._centerWave(samples);
+			let peak: number = 0.0;
+			for (let i: number = 0; i < wave.length; i++) peak = Math.max(peak, Math.abs(wave[i]));
+			if (peak > 0.0) {
+				for (let i: number = 0; i < wave.length; i++) wave[i] /= peak;
+			}
+			return wave;
+		})();
+		private static readonly _vrc6PulseWaves: Array<Float64Array | null> = (() => {
+			const waves: Array<Float64Array | null> = [];
+			for (let i: number = 0; i < Config.vrc6PulseWidthRange; i++) waves[i] = null;
+			return waves;
+		})();
+		
+		public static isPulseLikeInstrumentType(type: InstrumentType): boolean {
+			return type == InstrumentType.pulse || type == InstrumentType.vrc6;
+		}
+		
+		public static getPulseWidthRangeForInstrumentType(type: InstrumentType): number {
+			return (type == InstrumentType.vrc6) ? Config.vrc6PulseWidthRange : Config.pulseWidthRange;
+		}
+		
+		public static getPulseWidthRatioForInstrumentType(type: InstrumentType, pulseWidth: number): number {
+			return (type == InstrumentType.vrc6)
+				? Config.getVrc6PulseWidthRatio(pulseWidth)
+				: Config.getPulseWidthRatio(pulseWidth);
+		}
+		
+		public static getPulseWaveForInstrumentType(type: InstrumentType, pulseWidth: number): Float64Array {
+			return (type == InstrumentType.vrc6)
+				? Config.getVrc6PulseWave(pulseWidth)
+				: Config.getPulseWave(pulseWidth);
+		}
+		
 		public static getPulseWidthRatio(pulseWidth: number): number {
 			// Stepped mapping: 0..(range-1) -> duty cycle ratio.
 			// (Requested steps): 12.5%, 25%, 50%, 75%.
 			const index: number = Math.max(0, Math.min(Config.pulseWidthRange - 1, pulseWidth | 0));
 			return [0.125, 0.25, 0.5, 0.75][index];
+		}
+		
+		public static getVrc6PulseWidthRatio(pulseWidth: number): number {
+			// VRC6 supports 8 duty cycle steps.
+			// Map indices 0..7 to 1/16..8/16.
+			const index: number = Math.max(0, Math.min(Config.vrc6PulseWidthRange - 1, pulseWidth | 0));
+			return (index + 1) / 16;
 		}
 		
 		public static getPulseWave(pulseWidth: number): Float64Array {
@@ -356,6 +410,30 @@ namespace beepbox {
 				}
 				
 				Config._pulseWaves[index] = wave;
+			}
+			return wave;
+		}
+		
+		public static getVrc6PulseWave(pulseWidth: number): Float64Array {
+			const index: number = Math.max(0, Math.min(Config.vrc6PulseWidthRange - 1, pulseWidth | 0));
+			let wave: Float64Array | null = Config._vrc6PulseWaves[index];
+			if (wave == null) {
+				const duty: number = Config.getVrc6PulseWidthRatio(index);
+				const length: number = 64;
+				const samples: number[] = [];
+				// VRC6 pulse polarity is inverted relative to 2A03 pulse.
+				for (let i: number = 0; i < length; i++) {
+					samples[i] = (i / length < duty) ? -1.0 : 1.0;
+				}
+				wave = Config._centerWave(samples);
+				
+				let peak: number = 0.0;
+				for (let i: number = 0; i < wave.length; i++) peak = Math.max(peak, Math.abs(wave[i]));
+				if (peak > 0.0) {
+					for (let i: number = 0; i < wave.length; i++) wave[i] /= peak;
+				}
+				
+				Config._vrc6PulseWaves[index] = wave;
 			}
 			return wave;
 		}
@@ -831,6 +909,7 @@ namespace beepbox {
 		
 		private _cachedChip: { wave: number; filter: number; chorus: number; effect: number; volume: number; transition: number } | null = null;
 		private _cachedPulse: { wave: number; pulseWaveform: number; pulseSteps: number; pulseVolumeSteps: number; pulsePitchSteps: number; pulseHiPitchSteps: number; pulseDutyTick: number; pulseVolumeTick: number; pulsePitchTick: number; pulseHiPitchTick: number; pulseNesAccurate: boolean; pulseSequence: number[]; pulseVolumeSequence: number[]; pulsePitchSequence: number[]; pulseHiPitchSequence: number[]; volume: number; filter: number; chorus: number; effect: number; transition: number } | null = null;
+		private _cachedVrc6: { wave: number; pulseWaveform: number; pulseSteps: number; pulseVolumeSteps: number; pulsePitchSteps: number; pulseHiPitchSteps: number; pulseDutyTick: number; pulseVolumeTick: number; pulsePitchTick: number; pulseHiPitchTick: number; pulseNesAccurate: boolean; pulseSequence: number[]; pulseVolumeSequence: number[]; pulsePitchSequence: number[]; pulseHiPitchSequence: number[]; volume: number; filter: number; chorus: number; effect: number; transition: number } | null = null;
 		private _cachedFm: { wave: number; transition: number; effect: number; volume: number; algorithm: number; feedbackType: number; feedbackAmplitude: number; feedbackEnvelope: number; operators: { frequency: number; amplitude: number; envelope: number }[] } | null = null;
 		private _cachedNoise: { wave: number; transition: number; effect: number } | null = null;
 		
@@ -888,6 +967,7 @@ namespace beepbox {
 			
 			this._cachedChip = null;
 			this._cachedPulse = null;
+			this._cachedVrc6 = null;
 			this._cachedFm = null;
 			this._cachedNoise = null;
 		}
@@ -906,6 +986,30 @@ namespace beepbox {
 					break;
 				case InstrumentType.pulse:
 					this._cachedPulse = {
+						wave: this.wave,
+						pulseWaveform: this.pulseWaveform,
+						pulseSteps: this.pulseSteps,
+						pulseVolumeSteps: this.pulseVolumeSteps,
+						pulsePitchSteps: this.pulsePitchSteps,
+						pulseHiPitchSteps: this.pulseHiPitchSteps,
+						pulseDutyTick: this.pulseDutyTick,
+						pulseVolumeTick: this.pulseVolumeTick,
+						pulsePitchTick: this.pulsePitchTick,
+						pulseHiPitchTick: this.pulseHiPitchTick,
+						pulseNesAccurate: this.pulseNesAccurate,
+						pulseSequence: this.pulseSequence.slice(),
+						pulseVolumeSequence: this.pulseVolumeSequence.slice(),
+						pulsePitchSequence: this.pulsePitchSequence.slice(),
+						pulseHiPitchSequence: this.pulseHiPitchSequence.slice(),
+						volume: this.volume,
+						filter: this.filter,
+						chorus: this.chorus,
+						effect: this.effect,
+						transition: this.transition,
+					};
+					break;
+				case InstrumentType.vrc6:
+					this._cachedVrc6 = {
 						wave: this.wave,
 						pulseWaveform: this.pulseWaveform,
 						pulseSteps: this.pulseSteps,
@@ -989,6 +1093,31 @@ namespace beepbox {
 					this.chorus = this._cachedPulse.chorus;
 					this.effect = this._cachedPulse.effect;
 					this.transition = this._cachedPulse.transition;
+					return true;
+				case InstrumentType.vrc6:
+					if (this._cachedVrc6 == null) return false;
+					this.wave = this._cachedVrc6.wave;
+					this.pulseWaveform = this._cachedVrc6.pulseWaveform | 0;
+					this.pulseSteps = this._cachedVrc6.pulseSteps;
+					this.pulseVolumeSteps = this._cachedVrc6.pulseVolumeSteps;
+					this.pulsePitchSteps = this._cachedVrc6.pulsePitchSteps;
+					this.pulseHiPitchSteps = this._cachedVrc6.pulseHiPitchSteps;
+					this.pulseDutyTick = this._cachedVrc6.pulseDutyTick;
+					this.pulseVolumeTick = this._cachedVrc6.pulseVolumeTick;
+					this.pulsePitchTick = this._cachedVrc6.pulsePitchTick;
+					this.pulseHiPitchTick = this._cachedVrc6.pulseHiPitchTick;
+					this.pulseNesAccurate = this._cachedVrc6.pulseNesAccurate;
+					for (let i: number = 0; i < this.pulseSequence.length; i++) {
+						this.pulseSequence[i] = this._cachedVrc6.pulseSequence[i] | 0;
+						this.pulseVolumeSequence[i] = this._cachedVrc6.pulseVolumeSequence[i] | 0;
+						this.pulsePitchSequence[i] = this._cachedVrc6.pulsePitchSequence[i] | 0;
+						this.pulseHiPitchSequence[i] = this._cachedVrc6.pulseHiPitchSequence[i] | 0;
+					}
+					this.volume = this._cachedVrc6.volume;
+					this.filter = this._cachedVrc6.filter;
+					this.chorus = this._cachedVrc6.chorus;
+					this.effect = this._cachedVrc6.effect;
+					this.transition = this._cachedVrc6.transition;
 					return true;
 				case InstrumentType.fm:
 					if (this._cachedFm == null) return false;
@@ -1077,6 +1206,30 @@ namespace beepbox {
 					this.chorus = 0;
 					this.volume = 0;
 					break;
+				case InstrumentType.vrc6:
+					// Clone of 2A03 pulse instrument, but with VRC6 duty cycle range/polarity.
+					this.wave = 0;
+					this.pulseSteps = 1;
+					this.pulseVolumeSteps = 1;
+					this.pulsePitchSteps = 1;
+					this.pulseHiPitchSteps = 1;
+					this.pulseDutyTick = Config.pulseTickDefaultIndex;
+					this.pulseVolumeTick = Config.pulseTickDefaultIndex;
+					this.pulsePitchTick = Config.pulseTickDefaultIndex;
+					this.pulseHiPitchTick = Config.pulseTickDefaultIndex;
+					this.pulseNesAccurate = false;
+					for (let i: number = 0; i < this.pulseSequence.length; i++) {
+						this.pulseSequence[i] = this.wave;
+						this.pulseVolumeSequence[i] = Config.pulseVolumeMax;
+						this.pulsePitchSequence[i] = Config.pulsePitchCenter;
+						this.pulseHiPitchSequence[i] = Config.pulseHiPitchCenter;
+					}
+					this.filter = 0;
+					this.transition = 1;
+					this.effect = 0;
+					this.chorus = 0;
+					this.volume = 0;
+					break;
 				case InstrumentType.fm:
 					this.wave = 1;
 					this.transition = 1;
@@ -1130,6 +1283,7 @@ namespace beepbox {
 			
 			this._cachedChip = other._cachedChip == null ? null : {...other._cachedChip};
 			this._cachedPulse = other._cachedPulse == null ? null : {...other._cachedPulse, pulseSequence: other._cachedPulse.pulseSequence.slice(), pulseVolumeSequence: other._cachedPulse.pulseVolumeSequence.slice(), pulsePitchSequence: other._cachedPulse.pulsePitchSequence.slice(), pulseHiPitchSequence: other._cachedPulse.pulseHiPitchSequence.slice()};
+			this._cachedVrc6 = other._cachedVrc6 == null ? null : {...other._cachedVrc6, pulseSequence: other._cachedVrc6.pulseSequence.slice(), pulseVolumeSequence: other._cachedVrc6.pulseVolumeSequence.slice(), pulsePitchSequence: other._cachedVrc6.pulsePitchSequence.slice(), pulseHiPitchSequence: other._cachedVrc6.pulseHiPitchSequence.slice()};
 			if (other._cachedFm == null) {
 				this._cachedFm = null;
 			} else {
@@ -1288,10 +1442,10 @@ namespace beepbox {
 					
 					if (channel < this.pitchChannelCount) {
 						buffer.push(SongTagCode.startInstrument, base64IntToCharCode[instrument.type]);
-							if (instrument.type == InstrumentType.chip || instrument.type == InstrumentType.pulse) {
-								// chip / pulse (pulse reuses the wave field as pulse-width)
+							if (instrument.type == InstrumentType.chip || Config.isPulseLikeInstrumentType(instrument.type)) {
+								// chip / pulse-like (pulse-like reuses the wave field as pulse-width)
 								buffer.push(SongTagCode.wave, base64IntToCharCode[instrument.wave]);
-								if (instrument.type == InstrumentType.pulse) {
+								if (Config.isPulseLikeInstrumentType(instrument.type)) {
 									buffer.push(SongTagCode.pulseNesAccurate, base64IntToCharCode[instrument.pulseNesAccurate ? 1 : 0]);
 									buffer.push(SongTagCode.pulseWaveform, base64IntToCharCode[instrument.pulseWaveform & 0x3]);
 									buffer.push(SongTagCode.pulseSteps, base64IntToCharCode[instrument.pulseSteps - 1]);
@@ -1629,7 +1783,7 @@ namespace beepbox {
 						instrumentIndexIterator = 0;
 					}
 					const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
-						instrument.setTypeAndReset(Song._clip(0, 4, base64CharCodeToInt[compressed.charCodeAt(charIndex++)]));
+						instrument.setTypeAndReset(Song._clip(0, 5, base64CharCodeToInt[compressed.charCodeAt(charIndex++)]));
 					} else if (command == SongTagCode.wave) {
 						if (beforeThree) {
 							channel = base64CharCodeToInt[compressed.charCodeAt(charIndex++)];
@@ -1646,9 +1800,9 @@ namespace beepbox {
 							const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
 							const max: number = isDrums
 								? Config.drumNames.length
-								: (instrument.type == InstrumentType.pulse ? Config.pulseWidthRange : Config.waveNames.length);
+								: (Config.isPulseLikeInstrumentType(instrument.type) ? Config.getPulseWidthRangeForInstrumentType(instrument.type) : Config.waveNames.length);
 							instrument.wave = Song._clip(0, max, base64CharCodeToInt[compressed.charCodeAt(charIndex++)]);
-							if (!isDrums && instrument.type == InstrumentType.pulse) {
+							if (!isDrums && Config.isPulseLikeInstrumentType(instrument.type)) {
 								for (let s: number = 0; s < Config.pulseStepsMax; s++) instrument.pulseSequence[s] = instrument.wave;
 							}
 						}
@@ -1696,9 +1850,10 @@ namespace beepbox {
 						if (beforeThirteen) instrument.pulseHiPitchTick = Config.pulseTickDefaultIndex;
 					} else if (command == SongTagCode.pulseSequence) {
 						const instrument: Instrument = this.channels[instrumentChannelIterator].instruments[instrumentIndexIterator];
+						const widthRange: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
 						const sequenceLength: number = beforeEight ? Config.pulseSequenceLengthLegacy : (beforeThirteen ? Config.pulseStepsMaxLegacy : Config.pulseStepsMax);
 						for (let s: number = 0; s < sequenceLength; s++) {
-							const value: number = Song._clip(0, Config.pulseWidthRange, base64CharCodeToInt[compressed.charCodeAt(charIndex++)]);
+							const value: number = Song._clip(0, widthRange, base64CharCodeToInt[compressed.charCodeAt(charIndex++)]);
 							if (s < Config.pulseStepsMax) instrument.pulseSequence[s] = value;
 						}
 						if (beforeEight) {
@@ -2035,19 +2190,19 @@ namespace beepbox {
 								chorus: Config.chorusNames[instrument.chorus],
 								effect: Config.effectNames[instrument.effect],
 							});
-							} else if (instrument.type == InstrumentType.pulse) {
-								const dutyCycle: number[] = [];
-								const volumeSequence: number[] = [];
-								const pitchSequence: number[] = [];
-								const hiPitchSequence: number[] = [];
-								for (let s: number = 0; s < instrument.pulseSteps; s++) dutyCycle[s] = Math.round(Config.getPulseWidthRatio(instrument.pulseSequence[s]) * 100 * 100000) / 100000;
-								for (let s: number = 0; s < instrument.pulseVolumeSteps; s++) volumeSequence[s] = instrument.pulseVolumeSequence[s] | 0;
-								for (let s: number = 0; s < instrument.pulsePitchSteps; s++) pitchSequence[s] = Math.round(((instrument.pulsePitchSequence[s] | 0) - Config.pulsePitchCenter) / 8 * 1000) / 1000;
-								for (let s: number = 0; s < instrument.pulseHiPitchSteps; s++) hiPitchSequence[s] = (instrument.pulseHiPitchSequence[s] | 0) - Config.pulseHiPitchCenter;
+						} else if (Config.isPulseLikeInstrumentType(instrument.type)) {
+							const dutyCycle: number[] = [];
+							const volumeSequence: number[] = [];
+							const pitchSequence: number[] = [];
+							const hiPitchSequence: number[] = [];
+							for (let s: number = 0; s < instrument.pulseSteps; s++) dutyCycle[s] = Math.round(Config.getPulseWidthRatioForInstrumentType(instrument.type, instrument.pulseSequence[s]) * 100 * 100000) / 100000;
+							for (let s: number = 0; s < instrument.pulseVolumeSteps; s++) volumeSequence[s] = instrument.pulseVolumeSequence[s] | 0;
+							for (let s: number = 0; s < instrument.pulsePitchSteps; s++) pitchSequence[s] = Math.round(((instrument.pulsePitchSequence[s] | 0) - Config.pulsePitchCenter) / 8 * 1000) / 1000;
+							for (let s: number = 0; s < instrument.pulseHiPitchSteps; s++) hiPitchSequence[s] = (instrument.pulseHiPitchSequence[s] | 0) - Config.pulseHiPitchCenter;
 								instrumentArray.push({
 									type: Config.instrumentTypeNames[instrument.type],
 									volume: (5 - instrument.volume) * 20,
-									wave: instrument.pulseWaveform == 1 ? "triangle" : "pulse",
+									wave: instrument.pulseWaveform == 1 ? (instrument.type == InstrumentType.vrc6 ? "sawtooth" : "triangle") : "pulse",
 									pulseWidth: dutyCycle[0],
 									steps: instrument.pulseSteps,
 									dutyCycle: dutyCycle,
@@ -2310,27 +2465,37 @@ namespace beepbox {
 								if (instrument.chorus == -1) instrument.chorus = 0;
 								instrument.effect = Config.effectNames.indexOf(instrumentObject.effect);
 								if (instrument.effect == -1) instrument.effect = 0;
-								} else if (instrument.type == InstrumentType.pulse) {
+								} else if (Config.isPulseLikeInstrumentType(instrument.type)) {
 									if (instrumentObject.volume != undefined) {
 										instrument.volume = Song._clip(0, Config.volumeNames.length, Math.round(5 - (instrumentObject.volume | 0) / 20));
 									} else {
 										instrument.volume = 0;
 									}
 									
-									if (instrumentObject.wave == "triangle") {
-										instrument.pulseWaveform = 1;
+									if (instrument.type == InstrumentType.vrc6) {
+										if (instrumentObject.wave == "sawtooth" || instrumentObject.wave == "saw") {
+											instrument.pulseWaveform = 1;
+										} else {
+											// Default to pulse if missing or unrecognized.
+											instrument.pulseWaveform = 0;
+										}
 									} else {
-										// Default to pulse if missing or unrecognized.
-										instrument.pulseWaveform = 0;
+										if (instrumentObject.wave == "triangle") {
+											instrument.pulseWaveform = 1;
+										} else {
+											// Default to pulse if missing or unrecognized.
+											instrument.pulseWaveform = 0;
+										}
 									}
 									
 									const pickPulseIndex = (ratio: number): number => {
+										const widthRange: number = Config.getPulseWidthRangeForInstrumentType(instrument.type);
 										// Accept either a 0..1 ratio or a 0..100 percentage.
 										if (ratio > 1.0) ratio /= 100.0;
-										let bestIndex: number = Config.pulseWidthRange - 1;
+										let bestIndex: number = widthRange - 1;
 										let bestError: number = Number.POSITIVE_INFINITY;
-										for (let j: number = 0; j < Config.pulseWidthRange; j++) {
-											const err: number = Math.abs(Config.getPulseWidthRatio(j) - ratio);
+										for (let j: number = 0; j < widthRange; j++) {
+											const err: number = Math.abs(Config.getPulseWidthRatioForInstrumentType(instrument.type, j) - ratio);
 											if (err < bestError) { bestError = err; bestIndex = j; }
 										}
 										return bestIndex;
@@ -2387,7 +2552,7 @@ namespace beepbox {
 										instrument.wave = pickPulseIndex(+instrumentObject.pulseWidth);
 										for (let s: number = 0; s < instrument.pulseSequence.length; s++) instrument.pulseSequence[s] = instrument.wave;
 									} else {
-										instrument.wave = Config.pulseWidthRange - 1;
+										instrument.wave = Config.getPulseWidthRangeForInstrumentType(instrument.type) - 1;
 										for (let s: number = 0; s < instrument.pulseSequence.length; s++) instrument.pulseSequence[s] = instrument.wave;
 									}
 									
@@ -3366,7 +3531,7 @@ namespace beepbox {
 								// seamless start
 								resetPhases = false;
 								
-								if (!(!isDrum && instrument.type == InstrumentType.pulse)) {
+								if (!(!isDrum && Config.isPulseLikeInstrumentType(instrument.type))) {
 									// Only keep the duty-cycle sequencer position when seamlessly transitioning
 									// from an adjacent previous note. If there was a gap (no prevNote) or either
 									// note is silent at the join, reset to step 0.
@@ -3386,6 +3551,16 @@ namespace beepbox {
 							} else {
 								intervalTickStart = (prevNote.pitches[0] + prevNote.pins[prevNote.pins.length-1].interval - note.pitches[0]) * 0.5;
 								decayTimeTickStart = prevNote.pins[prevNote.pins.length-1].time * 0.5;
+								resetPhases = false;
+							}
+							} else if (transition == 4) {
+							// portamento start: full pitch glide from previous note, no volume fade
+							if (prevNote == null) {
+								transitionVolumeTickStart = 0.0;
+							} else if (prevNote.pins[prevNote.pins.length-1].volume == 0 || note.pins[0].volume == 0) {
+								transitionVolumeTickStart = 0.0;
+							} else {
+								intervalTickStart = (prevNote.pitches[0] + prevNote.pins[prevNote.pins.length-1].interval - note.pitches[0]);
 								resetPhases = false;
 							}
 						}
@@ -3411,13 +3586,13 @@ namespace beepbox {
 				if (pitches != null) {
 					const sampleTime: number = 1.0 / synth.samplesPerSecond;
 					tone.active = true;
-					if (!isDrum && instrument.type == InstrumentType.pulse && instrument.pulseNesAccurate && (atNoteStart || pianoJustPressed)) {
+					if (!isDrum && Config.isPulseLikeInstrumentType(instrument.type) && instrument.pulseNesAccurate && (atNoteStart || pianoJustPressed)) {
 						// Start the NES onset transient when the note begins.
 						tone.pulseNesTransient = 0.35;
 						tone.pulseNesReleaseSamplesRemaining = 0;
 					}
 					
-					if (!isDrum && instrument.type == InstrumentType.pulse) {
+					if (!isDrum && Config.isPulseLikeInstrumentType(instrument.type)) {
 						// Advance through the pulse duty cycle sequence over time.
 						// Each sequence advances on its own ms clock, starting/stopping with the note, independent of tempo.
 						const samplesPerSecond: number = synth.samplesPerSecond | 0;
@@ -3555,11 +3730,11 @@ namespace beepbox {
 						tone.filter = Math.pow(2, -filterScaleRate * secondsPerPart * decayTimeStart);
 						const endFilter: number = Math.pow(2, -filterScaleRate * secondsPerPart * decayTimeEnd);
 						tone.filterScale = Math.pow(endFilter / tone.filter, 1.0 / runLength);
-						const waveVolume: number = (instrument.type == InstrumentType.pulse)
+						const waveVolume: number = (Config.isPulseLikeInstrumentType(instrument.type))
 							? (instrument.pulseWaveform == 1 ? Config.waveVolumes[0] : Config.waveVolumes[1])
 							: Config.waveVolumes[instrument.wave];
 						settingsVolumeMult = 0.27 * 0.5 * waveVolume * Config.filterVolumes[filterIndex] * Config.chorusVolumes[chorusIndex];
-						if (instrument.type == InstrumentType.pulse) {
+						if (Config.isPulseLikeInstrumentType(instrument.type)) {
 							settingsVolumeMult *= Config.pulseVolumeBoost;
 							if (instrument.pulseWaveform == 1) settingsVolumeMult *= Config.pulseTriangleVolumeBoost;
 						}
@@ -3581,7 +3756,7 @@ namespace beepbox {
 					tone.phaseDeltaScale = Math.pow(2.0, ((intervalEnd - intervalStart) * intervalScale / 12.0) / runLength);
 					tone.vibratoScale = (partsSinceStart < Config.effectVibratoDelays[effectIndex]) ? 0.0 : Math.pow(2.0, Config.effectVibratos[effectIndex] / 12.0) - 1.0;
 			} else {
-				if (!isDrum && instrument.type == InstrumentType.pulse && instrument.pulseNesAccurate && (tone.pulseNesReleaseSamplesRemaining > 0 || wasActive)) {
+				if (!isDrum && Config.isPulseLikeInstrumentType(instrument.type) && instrument.pulseNesAccurate && (tone.pulseNesReleaseSamplesRemaining > 0 || wasActive)) {
 					if (tone.pulseNesReleaseSamplesRemaining <= 0) {
 						// On real hardware recordings, when the pulse is silenced, the AC-coupled output
 						// can linger at the low rail for a few cycles as the coupling capacitor settles.
@@ -3675,7 +3850,7 @@ namespace beepbox {
 				return Synth.fmSynthFunctionCache[fingerprint];
 			} else if (!song.getChannelIsDrum(channel) && instrument.type == InstrumentType.chip) {
 				return Synth.chipSynth;
-			} else if (!song.getChannelIsDrum(channel) && instrument.type == InstrumentType.pulse) {
+			} else if (!song.getChannelIsDrum(channel) && Config.isPulseLikeInstrumentType(instrument.type)) {
 				return Synth.pulseSynth;
 			} else if (song.getChannelIsDrum(channel)) {
 				return Synth.noiseSynth; 
@@ -3690,9 +3865,9 @@ namespace beepbox {
 			let effectY: number     = +Math.sin(synth.effectPhase);
 			let prevEffectY: number = +Math.sin(synth.effectPhase - synth.effectAngle);
 			
-			const filterIndex: number = (instrument.type == InstrumentType.pulse) ? 0 : instrument.filter;
-			const chorusIndex: number = (instrument.type == InstrumentType.pulse) ? 0 : instrument.chorus;
-			const effectIndex: number = (instrument.type == InstrumentType.pulse) ? 0 : instrument.effect;
+			const filterIndex: number = (Config.isPulseLikeInstrumentType(instrument.type)) ? 0 : instrument.filter;
+			const chorusIndex: number = (Config.isPulseLikeInstrumentType(instrument.type)) ? 0 : instrument.chorus;
+			const effectIndex: number = (Config.isPulseLikeInstrumentType(instrument.type)) ? 0 : instrument.effect;
 			
 			const wave: Float64Array = beepbox.Config.waves[instrument.wave];
 			const waveLength: number = +wave.length;
@@ -3829,8 +4004,8 @@ namespace beepbox {
 				return;
 			}
 			
-			const useTriangle: boolean = (instrument.pulseWaveform == 1);
-			const dutySteps: number = useTriangle ? 1 : Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulseSteps | 0));
+			const useAltWave: boolean = (instrument.pulseWaveform == 1);
+			const dutySteps: number = useAltWave ? 1 : Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulseSteps | 0));
 			const volumeSteps: number = Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulseVolumeSteps | 0));
 			const pitchSteps: number = Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulsePitchSteps | 0));
 			const hiPitchSteps: number = Math.max(1, Math.min(Config.pulseStepsMax, instrument.pulseHiPitchSteps | 0));
@@ -3848,7 +4023,8 @@ namespace beepbox {
 			if (hiPitchStepIndex >= hiPitchSteps) hiPitchStepIndex = hiPitchSteps - 1;
 
 			const nesCpuHz: number = Config.nesCpuFrequencyHz;
-			const timerDivider: number = useTriangle ? 32.0 : 16.0;
+			// Keep legacy divider behavior for the triangle mode; VRC6 saw uses pulse-like divider for now.
+			const timerDivider: number = (useAltWave && instrument.type == InstrumentType.pulse) ? 32.0 : 16.0;
 			const cpuDivPerSample: number = nesCpuHz / (timerDivider * samplesPerSecond);
 			
 			// Per-note tick clock state for each sequence.
@@ -3886,9 +4062,11 @@ namespace beepbox {
 					if (segmentLength <= 0) segmentLength = 1;
 					const segmentStop: number = bufferIndex + segmentLength;
 				
-				const dutyIndex: number = useTriangle ? 0 : (instrument.pulseSequence[dutyStepIndex] | 0);
-				const wave: Float64Array = useTriangle ? beepbox.Config.nesTriangleWave32 : beepbox.Config.getPulseWave(dutyIndex);
-				const waveLength: number = useTriangle ? 32.0 : +wave.length;
+				const dutyIndex: number = useAltWave ? 0 : (instrument.pulseSequence[dutyStepIndex] | 0);
+				const wave: Float64Array = useAltWave
+					? (instrument.type == InstrumentType.vrc6 ? beepbox.Config.vrc6SawWave : beepbox.Config.nesTriangleWave32)
+					: beepbox.Config.getPulseWaveForInstrumentType(instrument.type, dutyIndex);
+				const waveLength: number = (useAltWave && instrument.type == InstrumentType.pulse) ? 32.0 : +wave.length;
 				const stepVolume: number = Math.max(0.0, Math.min(1.0, (instrument.pulseVolumeSequence[volumeStepIndex] | 0) / Config.pulseVolumeMax));
 				const pitchValue: number = instrument.pulsePitchSequence[pitchStepIndex] | 0;
 				const pitchSemitones: number = (pitchValue - Config.pulsePitchCenter) / 8.0;
@@ -3903,18 +4081,9 @@ namespace beepbox {
 					effectY = effectYMult * effectY - prevEffectY;
 					prevEffectY = temp;
 					
-					let phaseDelta: number = 0.0;
-					const desiredFreq: number = basePhaseDelta * pitchMult * samplesPerSecond;
-					if (desiredFreq > 0.0) {
-						let timer: number = Math.round(nesCpuHz / (timerDivider * desiredFreq) - 1.0);
-						if (!useTriangle && timer < 8) {
-							timer = -1;
-						} else {
-							if (timer < 0) timer = 0;
-							if (timer > 2047) timer = 2047;
-							phaseDelta = cpuDivPerSample / (timer + 1);
-						}
-					}
+					// Use continuous pitch in both modes so very low notes still change pitch.
+					// (NES accurate mode still applies the NES-ish FIR/HP filtering + transient modeling.)
+					const phaseDelta: number = basePhaseDelta * pitchMult;
 					
 					let combinedWave: number = 0.0;
 					if (phaseDelta != 0.0) {
